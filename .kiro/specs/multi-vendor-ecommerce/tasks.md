@@ -1,0 +1,335 @@
+# Implementation Plan: Multi-Vendor E-Commerce Platform
+
+## Overview
+
+Incremental implementation of the MERN stack multi-vendor e-commerce platform. Tasks build from infrastructure and data models up through API controllers, middleware, and finally the React/Vite frontend. Each step integrates with the previous so no code is left orphaned.
+
+## Tasks
+
+- [x] 1. Project scaffolding and environment setup
+  - Initialize `server/` with `npm init`, install dependencies: express, mongoose, jsonwebtoken, bcryptjs, cookie-parser, cors, helmet, express-mongo-sanitize, hpp, express-rate-limit, express-validator, multer, cloudinary, winston, @sentry/node, dotenv, slugify
+  - Initialize `client/` with Vite + React template, install: axios, react-router-dom
+  - Create `server/.env.example` with all required variables: `PORT`, `NODE_ENV`, `MONGO_URI`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `CLIENT_URL`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `SENTRY_DSN`
+  - Create `client/.env.example` with `VITE_API_URL`
+  - Create root `.gitignore` excluding `.env`, `logs/`, `node_modules/`
+  - _Requirements: 21.1, 21.2, 21.3, 21.4_
+
+- [x] 2. Server entry point and Express app setup
+  - [x] 2.1 Create `server/config/db.js` with Mongoose connection logic
+    - Connect using `MONGO_URI`, log success/failure
+    - _Requirements: 6.1_
+  - [x] 2.2 Create `server/config/cloudinary.js` configuring the Cloudinary SDK from env vars
+    - _Requirements: 13.3_
+  - [x] 2.3 Create `server/utils/AppError.js` with the custom error class
+    - Extend `Error` with `statusCode` and `isOperational` fields
+    - _Requirements: 17.2_
+  - [x] 2.4 Create `server/utils/logger.js` using Winston
+    - Support `error`, `warn`, `info` levels
+    - Write to `logs/error.log` and `logs/combined.log` in production; console in development
+    - Never log passwords or JWT tokens
+    - _Requirements: 16.1, 16.2, 16.3, 16.4, 16.6_
+  - [x] 2.5 Create `server/app.js` registering all global middleware in order
+    - helmet, cors (strict origin from `CLIENT_URL`, credentials, explicit methods/headers), express.json (10kb limit), mongoSanitize, hpp
+    - Mount route files under `/api/v1`
+    - Register errorHandler last
+    - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.8_
+  - [x] 2.6 Create `server/middleware/errorHandler.js`
+    - Handle AppError, Mongoose ValidationError, CastError, duplicate key (11000), JWT errors, unhandled errors
+    - Never expose stack traces in production
+    - Return `{ status: "error", message, errors }` format
+    - _Requirements: 5.7, 17.2_
+  - [x] 2.7 Create `server/server.js` as HTTP entry point, call `connectDB()` then `app.listen()`
+    - Integrate `@sentry/node` initialization
+    - _Requirements: 16.5_
+
+- [x] 3. Data models
+  - [x] 3.1 Create `server/models/User.js`
+    - Fields: name, email (unique index), phone, password (select: false), role enum, store ref, isActive, isDeleted, deletedAt
+    - _Requirements: 6.1, 6.4, 1.7, 1.8_
+  - [x] 3.2 Create `server/models/Store.js`
+    - Fields: name, slug (unique index), owner ref, logo, address, phone, email, invoiceNote, isActive, isDeleted, deletedAt
+    - Pre-save hook: generate slug from name using slugify
+    - _Requirements: 6.1, 6.4, 6.5_
+  - [x] 3.3 Create `server/models/Supplier.js`
+    - Fields: name, email, phone, address, store ref (index), isDeleted, deletedAt
+    - _Requirements: 6.1, 6.4_
+  - [x] 3.4 Create `server/models/Product.js`
+    - Fields: name, slug, description, price, stock, category (index), unit, images array, store ref (compound index with isActive/isDeleted), supplier ref, isActive, isDeleted, deletedAt
+    - Pre-save hook: generate slug from name
+    - _Requirements: 6.1, 6.4, 6.6_
+  - [x] 3.5 Create `server/models/Cart.js`
+    - Fields: buyer ref (unique index), store ref, items array (product ref, name, price, quantity, subtotal), totalAmount, isDeleted, deletedAt
+    - Pre-save hook: recalculate totalAmount as sum of price × quantity
+    - _Requirements: 6.1, 6.4, 9.4_
+  - [ ]* 3.6 Write property test for Cart totalAmount pre-save hook
+    - **Property 15: Cart totalAmount is always the sum of item subtotals**
+    - **Validates: Requirements 9.4**
+  - [x] 3.7 Create `server/models/Order.js`
+    - Fields: orderNumber (unique), buyer ref, store ref, buyerSnapshot, storeSnapshot, items array, totalAmount, discountAmount, taxAmount, grandTotal, status enum, paymentStatus enum, notes, isDeleted, deletedAt
+    - Pre-save hook: generate orderNumber as `ORD-YYYYMMDD-XXXX`
+    - Indexes: `{ buyer, createdAt }`, `{ store, createdAt }`, `{ orderNumber }`
+    - _Requirements: 6.1, 6.4, 6.7, 10.7_
+  - [ ]* 3.8 Write property test for Order orderNumber format
+    - **Property 12: Order number matches required format**
+    - **Validates: Requirements 6.7**
+  - [ ]* 3.9 Write property test for slug auto-generation
+    - **Property 11: Slug auto-generation for Store and Product**
+    - **Validates: Requirements 6.5, 6.6**
+  - [ ]* 3.10 Write property test for soft delete behavior
+    - **Property 9: Soft delete sets isDeleted and deletedAt**
+    - **Validates: Requirements 6.3**
+  - [ ]* 3.11 Write property test for soft-deleted records excluded from queries
+    - **Property 10: Soft-deleted records are excluded from queries**
+    - **Validates: Requirements 6.2**
+
+- [ ] 4. Checkpoint — Ensure all model tests pass, ask the user if questions arise.
+
+- [x] 5. Core middleware
+  - [x] 5.1 Create `server/middleware/rateLimiter.js` exporting authLimiter (10/15min), generalLimiter (100/15min), orderLimiter (20/15min), uploadLimiter (10/15min)
+    - Return `{ status: "error", message: "Too many requests. Please try again later." }` on 429
+    - _Requirements: 4.1, 4.2, 4.3, 4.4_
+  - [x] 5.2 Create `server/middleware/auth.js`
+    - Read JWT from cookie, verify with JWT_SECRET, fetch user (isActive: true, isDeleted: false), attach to req.user
+    - Return 401 on invalid/expired token, 403 on inactive account
+    - _Requirements: 2.4, 2.5, 2.6_
+  - [x] 5.3 Create `server/middleware/requireStore.js`
+    - Check req.user.store, attach req.storeId, return 403 if missing
+    - _Requirements: 3.3_
+  - [x] 5.4 Create `server/middleware/restrictTo.js`
+    - `restrictTo(...roles)` factory returning 403 if user role not in list
+    - _Requirements: 3.1_
+  - [x] 5.5 Create `server/middleware/validate.js`
+    - Run express-validator validationResult, return 422 with `{ status: "error", message: "Validation failed", errors: [...] }` on failure
+    - _Requirements: 17.3_
+  - [ ]* 5.6 Write property test for restrictTo middleware
+    - **Property 7: Role-based access control returns 403 for unauthorized roles**
+    - **Validates: Requirements 3.1, 3.4, 3.5**
+  - [ ]* 5.7 Write property test for store ownership enforcement
+    - **Property 8: Store ownership enforced on all seller resource operations**
+    - **Validates: Requirements 3.2, 7.2, 7.3, 8.2, 11.2**
+
+- [x] 6. Authentication routes and controllers
+  - [x] 6.1 Create `server/validators/auth.js` with registration and login validation chains
+    - name (2–50 chars, trim, escape), email, phone, password (min 8, letter+number), role (buyer|seller only — reject superadmin with 422)
+    - _Requirements: 1.1, 1.2, 1.5_
+  - [x] 6.2 Create `server/controllers/auth.js` with register, login, logout, getMe handlers
+    - register: hash password (bcrypt salt 12), create User, if seller create Store and link; return success (never return password)
+    - login: verify credentials, issue JWT (7-day) in httpOnly/Secure/SameSite=Strict cookie (never in body)
+    - logout: expire cookie (maxAge: 1ms)
+    - getMe: return req.user excluding password
+    - _Requirements: 1.1, 1.3, 1.4, 1.7, 1.8, 2.1, 2.2, 2.3, 2.7, 2.8_
+  - [x] 6.3 Create `server/routes/auth.js` mounting POST /register, POST /login, POST /logout, GET /me with authLimiter on auth routes
+    - _Requirements: 4.1_
+  - [ ]* 6.4 Write property test for password never in responses
+    - **Property 1: Password never appears in responses**
+    - **Validates: Requirements 1.8, 2.8**
+  - [ ]* 6.5 Write property test for seller registration creates linked store
+    - **Property 2: Seller registration creates a linked store**
+    - **Validates: Requirements 1.3**
+  - [ ]* 6.6 Write property test for duplicate email rejection
+    - **Property 3: Duplicate email is rejected**
+    - **Validates: Requirements 1.4**
+  - [ ]* 6.7 Write property test for input sanitization
+    - **Property 4: Input sanitization strips whitespace and HTML**
+    - **Validates: Requirements 1.5**
+  - [ ]* 6.8 Write property test for bcrypt hash storage
+    - **Property 5: Passwords are stored as bcrypt hashes**
+    - **Validates: Requirements 1.7**
+  - [ ]* 6.9 Write property test for login sets secure httpOnly cookie
+    - **Property 6: Login sets a secure httpOnly cookie**
+    - **Validates: Requirements 2.1, 2.2**
+
+- [ ] 7. Checkpoint — Ensure all auth tests pass, ask the user if questions arise.
+
+- [x] 8. Product routes and controllers
+  - [x] 8.1 Create `server/validators/products.js`
+    - Require name (2–100 chars), price (numeric, min 0), stock (integer, min 0), category (non-empty); trim and escape strings
+    - _Requirements: 7.5_
+  - [x] 8.2 Create `server/utils/cloudinaryHelper.js` with uploadImage and deleteImage helpers
+    - uploadImage: validate MIME type (jpeg/png/webp only → 422), reject >5MB (413), upload to correct Cloudinary path
+    - deleteImage: delete by public_id
+    - _Requirements: 13.1, 13.2, 13.3, 13.4_
+  - [x] 8.3 Create `server/controllers/products.js` with createProduct, getProducts, getProduct, updateProduct, deleteProduct
+    - createProduct: verify store ownership, create product, return 201
+    - getProducts: filter isActive:true, isDeleted:false; support name search and category filter
+    - getProduct: return if isActive:true, isDeleted:false; else 404
+    - updateProduct: verify store ownership before update
+    - deleteProduct: verify store ownership, soft-delete, delete Cloudinary images
+    - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.6, 7.7_
+  - [x] 8.4 Create `server/routes/products.js` with public GET routes and seller-protected POST/PUT/DELETE routes using auth + requireStore + restrictTo('seller') + uploadLimiter
+    - _Requirements: 4.4_
+  - [ ]* 8.5 Write property test for product search and category filter
+    - **Property 23: Product search and category filter return only matching results**
+    - **Validates: Requirements 7.6, 20.2, 20.3**
+  - [ ]* 8.6 Write property test for image MIME type validation
+    - **Property 24: Image uploads reject invalid MIME types**
+    - **Validates: Requirements 13.1**
+  - [ ]* 8.7 Write property test for Cloudinary URL storage
+    - **Property 25: Only Cloudinary URL strings are stored for images**
+    - **Validates: Requirements 13.3, 13.4**
+
+- [x] 9. Supplier routes and controllers
+  - [x] 9.1 Create `server/validators/suppliers.js` with name required, trim/escape on string fields
+    - _Requirements: 8.1_
+  - [x] 9.2 Create `server/controllers/suppliers.js` with createSupplier, getSuppliers, updateSupplier, deleteSupplier
+    - All operations verify supplier.store matches req.storeId (403 if not)
+    - deleteSupplier: soft-delete only
+    - getSuppliers: filter by req.storeId and isDeleted:false
+    - _Requirements: 8.1, 8.2, 8.3, 8.4_
+  - [x] 9.3 Create `server/routes/suppliers.js` with all routes behind auth + requireStore + restrictTo('seller')
+
+- [x] 10. Cart routes and controllers
+  - [x] 10.1 Create `server/controllers/cart.js` with getCart, addItem, updateItem, removeItem, clearCart
+    - getCart: re-validate prices from Product collection, update snapshots if changed, recalculate totalAmount
+    - addItem: enforce single-store constraint (409 if different store), upsert Cart document
+    - updateItem: if quantity ≤ 0 remove item; else update quantity and subtotal
+    - removeItem: remove item from items array
+    - clearCart: set items to [] and totalAmount to 0
+    - _Requirements: 9.1, 9.2, 9.3, 9.5, 9.6_
+  - [x] 10.2 Create `server/routes/cart.js` with all routes behind auth + restrictTo('buyer')
+  - [ ]* 10.3 Write property test for cart single-store constraint
+    - **Property 13: Cart enforces single-store constraint**
+    - **Validates: Requirements 9.2**
+  - [ ]* 10.4 Write property test for cart price re-validation
+    - **Property 14: Cart price re-validation on fetch**
+    - **Validates: Requirements 9.3**
+
+- [x] 11. Order routes and controllers
+  - [x] 11.1 Create `server/validators/orders.js` with status enum validation for status update route
+    - _Requirements: 11.3_
+  - [x] 11.2 Create `server/controllers/orders.js` with placeOrder, getBuyerOrders, getStoreOrders, updateOrderStatus, getInvoice, getAllOrders
+    - placeOrder: validate stock for all items (409 if insufficient), create Order with buyerSnapshot, storeSnapshot, items snapshot, status:pending, paymentStatus:unpaid; atomically deduct stock and clear cart
+    - getBuyerOrders: filter by buyer = req.user._id, isDeleted:false
+    - getStoreOrders: filter by store = req.storeId, isDeleted:false
+    - updateOrderStatus: verify order.store matches req.storeId (403 if not), validate status enum
+    - getInvoice: allow buyer (own order), seller (own store order), superadmin; return full order with snapshots
+    - getAllOrders: superadmin only, all isDeleted:false orders
+    - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7, 11.1, 11.2, 11.3, 11.4, 11.5, 12.1, 12.2, 12.3_
+  - [x] 11.3 Create `server/routes/orders.js` mounting all order routes with appropriate auth/role middleware and orderLimiter on POST /orders
+    - _Requirements: 4.3_
+  - [ ]* 11.4 Write property test for order placement stock validation
+    - **Property 16: Order placement validates stock for all items**
+    - **Validates: Requirements 10.1**
+  - [ ]* 11.5 Write property test for order snapshot completeness
+    - **Property 17: Order snapshots capture complete buyer, store, and item data**
+    - **Validates: Requirements 10.2, 10.3, 10.4, 10.7**
+  - [ ]* 11.6 Write property test for atomic stock deduction and cart clear
+    - **Property 18: Order creation atomically deducts stock and clears cart**
+    - **Validates: Requirements 10.5**
+  - [ ]* 11.7 Write property test for order listing scoped to requesting party
+    - **Property 19: Order listings are scoped to the requesting party**
+    - **Validates: Requirements 11.1, 11.4, 11.5**
+  - [ ]* 11.8 Write property test for valid order status transitions
+    - **Property 20: Order status transitions are restricted to valid enum values**
+    - **Validates: Requirements 11.3**
+
+- [x] 12. Store and admin routes and controllers
+  - [x] 12.1 Create `server/controllers/stores.js` with getMyStore, updateMyStore, getAllStores, toggleStoreStatus
+    - getMyStore: return store for req.storeId
+    - updateMyStore: update only req.storeId store (name, logo, address, phone, email, invoiceNote)
+    - getAllStores: superadmin only, isDeleted:false
+    - toggleStoreStatus: superadmin only, toggle isActive
+    - _Requirements: 14.1, 14.2, 14.3, 14.4, 14.5_
+  - [x] 12.2 Create `server/routes/stores.js`
+  - [x] 12.3 Create `server/controllers/admin.js` with getAllUsers, toggleUserStatus, getPlatformStats
+    - getAllUsers: isDeleted:false
+    - toggleUserStatus: toggle isActive; deactivated users get 403 on next login attempt
+    - getPlatformStats: aggregate total users, stores, orders, revenue
+    - _Requirements: 15.1, 15.2, 15.3, 15.4_
+  - [x] 12.4 Create `server/routes/admin.js` with all routes behind auth + restrictTo('superadmin')
+
+- [ ] 13. Checkpoint — Ensure all backend tests pass, ask the user if questions arise.
+
+- [ ] 14. API response format consistency
+  - [ ] 14.1 Audit all controllers to ensure success responses use `{ status: "success", data: {}, message: "..." }` and error responses use `{ status: "error", message: "...", errors: [] }`
+    - _Requirements: 17.1, 17.2, 17.3_
+  - [ ]* 14.2 Write property test for API response format
+    - **Property 21: API responses follow a consistent format**
+    - **Validates: Requirements 17.1, 17.2, 17.3**
+
+- [x] 15. React/Vite client foundation
+  - [x] 15.1 Create `client/src/api/axiosInstance.js`
+    - Configure baseURL from `VITE_API_URL`, withCredentials: true
+    - Add response interceptor: on 401, clear AuthContext and redirect to /login
+    - _Requirements: 18.3, 18.4, 18.5_
+  - [x] 15.2 Create `client/src/context/AuthContext.jsx`
+    - On mount call GET /auth/me to populate user state
+    - Expose user, setUser, logout (calls POST /auth/logout then clears state)
+    - Never store tokens in localStorage or sessionStorage
+    - _Requirements: 18.1, 18.2_
+  - [x] 15.3 Create `client/src/components/ProtectedRoute.jsx`
+    - Redirect unauthenticated users to /login
+    - Accept allowedRoles prop; redirect role-mismatched users to their dashboard
+    - _Requirements: 19.1, 19.2_
+  - [x] 15.4 Create `client/src/App.jsx` defining all routes with separate buyer/seller/admin route groups wrapped in ProtectedRoute
+    - _Requirements: 19.3_
+  - [ ]* 15.5 Write property test for ProtectedRoute access control
+    - **Property 22: ProtectedRoute enforces authentication and role access**
+    - **Validates: Requirements 19.1, 19.2**
+
+- [x] 16. Public pages
+  - [x] 16.1 Create `client/src/pages/Home.jsx`
+    - Fetch products from GET /api/v1/products on mount (no auth required)
+    - Implement real-time/debounced name search and category filter
+    - Include company overview/about section
+    - _Requirements: 20.1, 20.2, 20.3, 20.4_
+  - [x] 16.2 Create `client/src/pages/About.jsx` at route `/about` with static platform information
+    - _Requirements: 20.5_
+  - [x] 16.3 Create `client/src/pages/Login.jsx` and `client/src/pages/Register.jsx`
+    - Login: POST /auth/login, on success update AuthContext and redirect to role dashboard
+    - Register: POST /auth/register with role selection (buyer/seller only)
+    - Display 422 validation errors inline per field
+    - _Requirements: 1.1, 1.2_
+  - [x] 16.4 Create `client/src/components/Navbar.jsx` showing appropriate links based on auth state and role
+
+- [x] 17. Buyer pages
+  - [x] 17.1 Create `client/src/pages/buyer/Cart.jsx`
+    - Fetch GET /cart, display items with current prices, support quantity update and item removal, clear cart button
+    - _Requirements: 9.3, 9.5, 9.6_
+  - [x] 17.2 Create `client/src/pages/buyer/Orders.jsx`
+    - Fetch GET /orders/my, display order list with status and totals
+    - _Requirements: 11.4_
+  - [x] 17.3 Create `client/src/pages/buyer/Invoice.jsx`
+    - Fetch GET /orders/:orderId/invoice
+    - Render exclusively from snapshot fields (buyerSnapshot, storeSnapshot, items)
+    - Display all required invoice fields: store header, order number, date, buyer info, itemized table, discount/tax rows, grand total, notes, invoiceNote footer
+    - useEffect with setTimeout(window.print, 500) after data loads
+    - @media print CSS to hide nav/buttons
+    - _Requirements: 12.4, 12.5, 12.6, 12.7_
+
+- [x] 18. Seller pages
+  - [x] 18.1 Create `client/src/pages/seller/Dashboard.jsx` with summary stats (product count, order count, revenue)
+  - [x] 18.2 Create `client/src/pages/seller/Products.jsx`
+    - List store products, create/edit/delete product with image upload
+    - _Requirements: 7.1, 7.4, 13.1, 13.2_
+  - [x] 18.3 Create `client/src/pages/seller/Suppliers.jsx`
+    - List, create, edit, delete suppliers for the seller's store
+    - _Requirements: 8.1, 8.3_
+  - [x] 18.4 Create `client/src/pages/seller/Orders.jsx`
+    - Fetch GET /orders/store, display orders, allow status update via PATCH /orders/:id/status
+    - _Requirements: 11.1, 11.2, 11.3_
+  - [x] 18.5 Create `client/src/pages/seller/StoreSettings.jsx`
+    - Fetch GET /stores/me, allow update of name, logo, address, phone, email, invoiceNote
+    - _Requirements: 14.1, 14.2, 14.3_
+
+- [x] 19. Superadmin pages
+  - [x] 19.1 Create `client/src/pages/admin/Users.jsx`
+    - Fetch GET /admin/users, display user list, toggle active status via PATCH /admin/users/:id/status
+    - _Requirements: 15.1, 15.2_
+  - [x] 19.2 Create `client/src/pages/admin/Stores.jsx`
+    - Fetch GET /stores, display store list, toggle active status via PATCH /stores/:id/status
+    - _Requirements: 14.4, 14.5_
+  - [x] 19.3 Create `client/src/pages/admin/Stats.jsx`
+    - Fetch GET /admin/stats, display total users, stores, orders, revenue
+    - _Requirements: 15.3_
+
+- [ ] 20. Final checkpoint — Ensure all tests pass, ask the user if questions arise.
+
+## Notes
+
+- Tasks marked with `*` are optional and can be skipped for faster MVP
+- Each task references specific requirements for traceability
+- Checkpoints ensure incremental validation
+- Property tests use fast-check with minimum 100 iterations per test
+- Each property test must include the comment: `// Feature: multi-vendor-ecommerce, Property N: <property_text>`
+- Unit tests use Jest (backend) and Vitest + React Testing Library (frontend)
