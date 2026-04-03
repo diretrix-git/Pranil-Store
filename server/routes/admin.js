@@ -5,7 +5,7 @@ const { restrictTo } = require('../middleware/restrictTo');
 
 const router = express.Router();
 
-router.use(protect, restrictTo('superadmin'));
+router.use(protect, restrictTo('admin'));
 
 router.get('/users', getAllUsers);
 router.patch('/users/:id/status', toggleUserStatus);

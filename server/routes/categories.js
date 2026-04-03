@@ -1,9 +1,12 @@
 const express = require('express');
-const { getCategories } = require('../controllers/categories');
+const { getCategories, createCategory, deleteCategory } = require('../controllers/categories');
+const { protect } = require('../middleware/auth');
+const { restrictTo } = require('../middleware/restrictTo');
 
 const router = express.Router();
 
-// Public — anyone can fetch categories
 router.get('/', getCategories);
+router.post('/', protect, restrictTo('admin'), createCategory);
+router.delete('/:id', protect, restrictTo('admin'), deleteCategory);
 
 module.exports = router;
