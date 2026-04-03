@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import api from '../../api/axiosInstance';
+import { useEffect } from "react";
+import { useParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import api from "../../api/axiosInstance";
 
 const Spinner = () => (
   <div className="flex justify-center py-16">
@@ -13,7 +13,7 @@ export default function InvoicePage() {
   const { orderId } = useParams();
 
   const { data: order, isLoading } = useQuery({
-    queryKey: ['invoice', orderId],
+    queryKey: ["invoice", orderId],
     queryFn: async () => {
       const res = await api.get(`/orders/${orderId}/invoice`);
       return res.data.order ?? res.data;
@@ -28,7 +28,10 @@ export default function InvoicePage() {
   }, [order]);
 
   if (isLoading) return <Spinner />;
-  if (!order) return <p className="text-center py-16 text-gray-500">Invoice not found.</p>;
+  if (!order)
+    return (
+      <p className="text-center py-16 text-gray-500">Invoice not found.</p>
+    );
 
   const store = order.storeSnapshot ?? {};
   const buyer = order.buyerSnapshot ?? {};
@@ -48,12 +51,22 @@ export default function InvoicePage() {
         <div className="flex justify-between items-start mb-8 border-b border-gray-300 pb-6">
           <div>
             {store.logo && (
-              <img src={store.logo} alt={store.name} className="h-14 mb-2 object-contain" />
+              <img
+                src={store.logo}
+                alt={store.name}
+                className="h-14 mb-2 object-contain"
+              />
             )}
             <h2 className="text-xl font-bold">{store.name}</h2>
-            {store.address && <p className="text-sm text-gray-600">{store.address}</p>}
-            {store.phone && <p className="text-sm text-gray-600">{store.phone}</p>}
-            {store.email && <p className="text-sm text-gray-600">{store.email}</p>}
+            {store.address && (
+              <p className="text-sm text-gray-600">{store.address}</p>
+            )}
+            {store.phone && (
+              <p className="text-sm text-gray-600">{store.phone}</p>
+            )}
+            {store.email && (
+              <p className="text-sm text-gray-600">{store.email}</p>
+            )}
           </div>
           <div className="text-right">
             <h1 className="text-3xl font-bold text-gray-800">INVOICE</h1>
@@ -66,32 +79,56 @@ export default function InvoicePage() {
 
         {/* Buyer Info */}
         <div className="mb-8">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Bill To</h3>
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            Bill To
+          </h3>
           <p className="font-semibold">{buyer.name}</p>
-          {buyer._id && <p className="text-sm text-gray-600">ID: {buyer._id}</p>}
-          {buyer.phone && <p className="text-sm text-gray-600">{buyer.phone}</p>}
-          {buyer.address && <p className="text-sm text-gray-600">{buyer.address}</p>}
+          {buyer._id && (
+            <p className="text-sm text-gray-600">ID: {buyer._id}</p>
+          )}
+          {buyer.phone && (
+            <p className="text-sm text-gray-600">{buyer.phone}</p>
+          )}
+          {buyer.address && (
+            <p className="text-sm text-gray-600">{buyer.address}</p>
+          )}
         </div>
 
         {/* Items Table */}
         <table className="w-full text-sm mb-6 border-collapse">
           <thead>
             <tr className="border-b-2 border-gray-300">
-              <th className="text-left py-2 font-semibold text-gray-700">Item</th>
-              <th className="text-center py-2 font-semibold text-gray-700">Unit</th>
-              <th className="text-center py-2 font-semibold text-gray-700">Qty</th>
-              <th className="text-right py-2 font-semibold text-gray-700">Unit Price</th>
-              <th className="text-right py-2 font-semibold text-gray-700">Subtotal</th>
+              <th className="text-left py-2 font-semibold text-gray-700">
+                Item
+              </th>
+              <th className="text-center py-2 font-semibold text-gray-700">
+                Unit
+              </th>
+              <th className="text-center py-2 font-semibold text-gray-700">
+                Qty
+              </th>
+              <th className="text-right py-2 font-semibold text-gray-700">
+                Unit Price
+              </th>
+              <th className="text-right py-2 font-semibold text-gray-700">
+                Subtotal
+              </th>
             </tr>
           </thead>
           <tbody>
             {items.map((item, i) => (
               <tr key={i} className="border-b border-gray-100">
                 <td className="py-2">{item.name}</td>
-                <td className="py-2 text-center text-gray-600">{item.unit ?? '—'}</td>
+                <td className="py-2 text-center text-gray-600">
+                  {item.unit ?? "—"}
+                </td>
                 <td className="py-2 text-center">{item.quantity}</td>
-                <td className="py-2 text-right">${Number(item.price).toFixed(2)}</td>
-                <td className="py-2 text-right">${(Number(item.price) * item.quantity).toFixed(2)}</td>
+                <td className="py-2 text-right">
+                  ${Number(item.price).toFixed(2)}
+                </td>
+                <td className="py-2 text-right">
+                  ${(Number(item.price) * item.quantity).toFixed(2)}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -102,7 +139,9 @@ export default function InvoicePage() {
           <div className="w-64 text-sm">
             <div className="flex justify-between py-1">
               <span className="text-gray-600">Subtotal</span>
-              <span>${Number(order.subtotal ?? order.totalAmount).toFixed(2)}</span>
+              <span>
+                ${Number(order.subtotal ?? order.totalAmount).toFixed(2)}
+              </span>
             </div>
             {order.discountAmount > 0 && (
               <div className="flex justify-between py-1 text-green-700">
@@ -126,7 +165,9 @@ export default function InvoicePage() {
         {/* Notes */}
         {order.notes && (
           <div className="mb-6">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Notes</h3>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+              Notes
+            </h3>
             <p className="text-sm text-gray-600">{order.notes}</p>
           </div>
         )}

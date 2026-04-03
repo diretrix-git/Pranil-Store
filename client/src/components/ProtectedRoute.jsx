@@ -1,7 +1,7 @@
-import { Navigate, Outlet } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { Navigate, Outlet } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
-const ROLE_HOME = { buyer: '/', admin: '/admin/dashboard' };
+const ROLE_HOME = { buyer: "/", admin: "/admin/dashboard" };
 
 // Blocks access to protected pages when not logged in
 export default function ProtectedRoute({ allowedRoles }) {
@@ -18,7 +18,7 @@ export default function ProtectedRoute({ allowedRoles }) {
   if (!user) return <Navigate to="/login" replace />;
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to={ROLE_HOME[user.role] ?? '/'} replace />;
+    return <Navigate to={ROLE_HOME[user.role] ?? "/"} replace />;
   }
 
   return <Outlet />;
@@ -36,7 +36,7 @@ export function GuestRoute() {
     );
   }
 
-  if (user) return <Navigate to={ROLE_HOME[user.role] ?? '/'} replace />;
+  if (user) return <Navigate to={ROLE_HOME[user.role] ?? "/"} replace />;
 
   return <Outlet />;
 }

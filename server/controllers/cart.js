@@ -1,6 +1,6 @@
-const Cart = require('../models/Cart');
-const Product = require('../models/Product');
-const AppError = require('../utils/AppError');
+const Cart = require("../models/Cart");
+const Product = require("../models/Product");
+const AppError = require("../utils/AppError");
 
 const getCart = async (req, res, next) => {
   try {
@@ -22,7 +22,13 @@ const getCart = async (req, res, next) => {
     cart.items = cart.items.filter((item) => item.product != null);
     if (priceChanged) await cart.save();
 
-    res.status(200).json({ status: 'success', data: { cart, priceChanged }, message: 'Cart retrieved' });
+    res
+      .status(200)
+      .json({
+        status: "success",
+        data: { cart, priceChanged },
+        message: "Cart retrieved",
+      });
   } catch (err) {
     next(err);
   }
@@ -32,18 +38,31 @@ const addItem = async (req, res, next) => {
   try {
     const { productId, quantity = 1 } = req.body;
 
-    const product = await Product.findOne({ _id: productId, isActive: true, isDeleted: false });
-    if (!product) return next(new AppError('Product not found.', 404));
+    const product = await Product.findOne({
+      _id: productId,
+      isActive: true,
+      isDeleted: false,
+    });
+    if (!product) return next(new AppError("Product not found.", 404));
 
     let cart = await Cart.findOne({ buyer: req.user._id });
     if (!cart) cart = await Cart.create({ buyer: req.user._id, items: [] });
 
-    if (cart.items.length > 0 && cart.store && cart.store.toString() !== product.store.toString()) {
-      return next(new AppError('Your cart contains items from a different store. Please clear your cart first.', 409));
+    if (
+      cart.items.length > 0 &&
+      cart.store &&
+      cart.store.toString() !== product.store.toString()
+    ) {
+      return next(
+        new AppError(
+          "Your cart contains items from a different store. Please clear your cart first.",
+          409,
+        ),
+      );
     }
 
     const existingIndex = cart.items.findIndex(
-      (i) => i.product && i.product.toString() === productId.toString()
+      (i) => i.product && i.product.toString() === productId.toString(),
     );
     if (existingIndex >= 0) {
       cart.items[existingIndex].quantity += quantity;
@@ -62,7 +81,13 @@ const addItem = async (req, res, next) => {
     cart.store = product.store;
     await cart.save();
 
-    res.status(200).json({ status: 'success', data: { cart }, message: 'Item added to cart' });
+    res
+      .status(200)
+      .json({
+        status: "success",
+        data: { cart },
+        message: "Item added to cart",
+      });
   } catch (err) {
     next(err);
   }
@@ -72,10 +97,13 @@ const updateItem = async (req, res, next) => {
   try {
     const { quantity } = req.body;
     const cart = await Cart.findOne({ buyer: req.user._id });
-    if (!cart) return next(new AppError('Cart not found.', 404));
+    if (!cart) return next(new AppError("Cart not found.", 404));
 
-    const itemIndex = cart.items.findIndex((i) => i.product.toString() === req.params.productId.toString());
-    if (itemIndex === -1) return next(new AppError('Item not found in cart.', 404));
+    const itemIndex = cart.items.findIndex(
+      (i) => i.product.toString() === req.params.productId.toString(),
+    );
+    if (itemIndex === -1)
+      return next(new AppError("Item not found in cart.", 404));
 
     if (quantity <= 0) {
       cart.items.splice(itemIndex, 1);
@@ -84,7 +112,9 @@ const updateItem = async (req, res, next) => {
     }
 
     await cart.save();
-    res.status(200).json({ status: 'success', data: { cart }, message: 'Cart updated' });
+    res
+      .status(200)
+      .json({ status: "success", data: { cart }, message: "Cart updated" });
   } catch (err) {
     next(err);
   }
@@ -93,12 +123,16 @@ const updateItem = async (req, res, next) => {
 const removeItem = async (req, res, next) => {
   try {
     const cart = await Cart.findOne({ buyer: req.user._id });
-    if (!cart) return next(new AppError('Cart not found.', 404));
+    if (!cart) return next(new AppError("Cart not found.", 404));
 
-    cart.items = cart.items.filter((i) => i.product.toString() !== req.params.productId.toString());
+    cart.items = cart.items.filter(
+      (i) => i.product.toString() !== req.params.productId.toString(),
+    );
     await cart.save();
 
-    res.status(200).json({ status: 'success', data: { cart }, message: 'Item removed' });
+    res
+      .status(200)
+      .json({ status: "success", data: { cart }, message: "Item removed" });
   } catch (err) {
     next(err);
   }
@@ -112,7 +146,9 @@ const clearCart = async (req, res, next) => {
       cart.store = null;
       await cart.save();
     }
-    res.status(200).json({ status: 'success', data: null, message: 'Cart cleared' });
+    res
+      .status(200)
+      .json({ status: "success", data: null, message: "Cart cleared" });
   } catch (err) {
     next(err);
   }
