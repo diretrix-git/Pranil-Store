@@ -14,18 +14,37 @@ export default function Navbar() {
   };
 
   const navLinks = user?.role === 'buyer'
-    ? [{ to: '/', label: 'Home' }, { to: '/cart', label: '🛒 Cart' }, { to: '/orders', label: 'My Orders' }]
-    : user?.role === 'seller'
-    ? [{ to: '/seller/dashboard', label: 'Dashboard' }, { to: '/seller/products', label: 'Products' }, { to: '/seller/orders', label: 'Orders' }, { to: '/seller/suppliers', label: 'Suppliers' }, { to: '/seller/settings', label: 'Settings' }]
-    : user?.role === 'superadmin'
-    ? [{ to: '/admin/dashboard', label: 'Dashboard' }, { to: '/admin/users', label: 'Users' }, { to: '/admin/stores', label: 'Stores' }]
-    : [{ to: '/', label: 'Home' }, { to: '/about', label: 'About' }];
+    ? [
+        { to: '/',        label: 'Home' },
+        { to: '/cart',    label: '🛒 Cart' },
+        { to: '/orders',  label: 'My Orders' },
+        { to: '/contact', label: 'Contact' },
+      ]
+    : user?.role === 'admin'
+    ? [
+        { to: '/admin/dashboard',  label: 'Dashboard' },
+        { to: '/admin/products',   label: 'Products' },
+        { to: '/admin/categories', label: 'Categories' },
+        { to: '/admin/orders',     label: 'Orders' },
+        { to: '/admin/users',      label: 'Users' },
+        { to: '/admin/messages',   label: 'Messages' },
+      ]
+    : [
+        { to: '/',        label: 'Home' },
+        { to: '/about',   label: 'About' },
+        { to: '/contact', label: 'Contact' },
+      ];
+
+  const roleBadge = user?.role === 'buyer'
+    ? { label: '🛒 Buyer', cls: 'bg-blue-50 text-blue-600 border-blue-200' }
+    : user?.role === 'admin'
+    ? { label: '⚡ Admin', cls: 'bg-red-50 text-red-600 border-red-200' }
+    : null;
 
   return (
     <nav className="sticky top-0 z-50 bg-white border-b border-slate-100 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          {/* Logo */}
           <Link to="/" className="flex items-center gap-2 shrink-0">
             <motion.span whileHover={{ rotate: 15 }} className="text-2xl">🛍️</motion.span>
             <span className="text-xl font-black bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">
@@ -47,14 +66,11 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-2">
             {user ? (
               <div className="flex items-center gap-3">
-                {/* Role badge */}
-                <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${
-                  user.role === 'buyer' ? 'bg-blue-50 text-blue-600 border-blue-200' :
-                  user.role === 'seller' ? 'bg-violet-50 text-violet-600 border-violet-200' :
-                  'bg-red-50 text-red-600 border-red-200'
-                }`}>
-                  {user.role === 'buyer' ? '🛒 Buyer' : user.role === 'seller' ? '🏪 Seller' : '⚡ Admin'}
-                </span>
+                {roleBadge && (
+                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${roleBadge.cls}`}>
+                    {roleBadge.label}
+                  </span>
+                )}
                 <span className="text-sm text-slate-600 font-medium hidden lg:block">{user.name}</span>
                 <motion.button whileTap={{ scale: 0.95 }} onClick={handleLogout}
                   className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:opacity-90 transition-opacity shadow-sm shadow-violet-200">
@@ -87,12 +103,9 @@ export default function Navbar() {
       {/* Mobile menu */}
       <AnimatePresence>
         {menuOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="md:hidden border-t border-slate-100 bg-white overflow-hidden"
-          >
+            className="md:hidden border-t border-slate-100 bg-white overflow-hidden">
             <div className="px-4 py-3 space-y-1">
               {navLinks.map(({ to, label }) => (
                 <Link key={to} to={to} onClick={() => setMenuOpen(false)}
@@ -104,13 +117,11 @@ export default function Navbar() {
                 {user ? (
                   <>
                     <div className="px-3 py-2 flex items-center gap-2">
-                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${
-                        user.role === 'buyer' ? 'bg-blue-50 text-blue-600 border-blue-200' :
-                        user.role === 'seller' ? 'bg-violet-50 text-violet-600 border-violet-200' :
-                        'bg-red-50 text-red-600 border-red-200'
-                      }`}>
-                        {user.role === 'buyer' ? '🛒 Buyer' : user.role === 'seller' ? '🏪 Seller' : '⚡ Admin'}
-                      </span>
+                      {roleBadge && (
+                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${roleBadge.cls}`}>
+                          {roleBadge.label}
+                        </span>
+                      )}
                       <span className="text-sm text-slate-600 font-medium">{user.name}</span>
                     </div>
                     <button onClick={handleLogout}
