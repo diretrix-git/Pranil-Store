@@ -44,8 +44,6 @@ const orderSchema = new mongoose.Schema(
     orderNumber: { type: String, unique: true },
     buyer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     buyerSnapshot: { type: buyerSnapshotSchema },
-    store: { type: mongoose.Schema.Types.ObjectId, ref: 'Store', required: true },
-    storeSnapshot: { type: storeSnapshotSchema },
     items: [orderItemSchema],
     subtotal: { type: Number, required: true },
     taxAmount: { type: Number, default: 0 },
@@ -81,7 +79,6 @@ orderSchema.pre('save', function () {
 });
 
 orderSchema.index({ buyer: 1, createdAt: -1 });
-orderSchema.index({ store: 1, createdAt: -1 });
 // orderNumber already has unique:true on the field definition, no separate index needed
 
 module.exports = mongoose.model('Order', orderSchema);
