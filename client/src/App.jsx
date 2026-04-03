@@ -2,37 +2,36 @@ import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './context/AuthContext';
-import ProtectedRoute from './components/ProtectedRoute';
+import ProtectedRoute, { GuestRoute } from './components/ProtectedRoute';
 
-// Public pages
-const HomePage = lazy(() => import('./pages/buyer/HomePage'));
-const AboutPage = lazy(() => import('./pages/AboutPage'));
-const LoginPage = lazy(() => import('./pages/LoginPage'));
-const RegisterPage = lazy(() => import('./pages/RegisterPage'));
-const ProductPage = lazy(() => import('./pages/buyer/ProductPage'));
+// Public
+const HomePage      = lazy(() => import('./pages/buyer/HomePage'));
+const AboutPage     = lazy(() => import('./pages/AboutPage'));
+const ContactPage   = lazy(() => import('./pages/ContactPage'));
+const ProductPage   = lazy(() => import('./pages/buyer/ProductPage'));
 
-// Buyer pages
-const CartPage = lazy(() => import('./pages/buyer/CartPage'));
-const OrdersPage = lazy(() => import('./pages/buyer/OrdersPage'));
-const InvoicePage = lazy(() => import('./pages/buyer/InvoicePage'));
+// Guest-only (redirect away if logged in)
+const LoginPage     = lazy(() => import('./pages/LoginPage'));
+const RegisterPage  = lazy(() => import('./pages/RegisterPage'));
 
-// Seller pages
-const SellerDashboardPage = lazy(() => import('./pages/seller/DashboardPage'));
-const SellerProductsPage = lazy(() => import('./pages/seller/ProductsPage'));
-const SellerSuppliersPage = lazy(() => import('./pages/seller/SuppliersPage'));
-const SellerOrdersPage = lazy(() => import('./pages/seller/OrdersPage'));
-const SellerStoreSettingsPage = lazy(() => import('./pages/seller/StoreSettingsPage'));
+// Buyer
+const CartPage      = lazy(() => import('./pages/buyer/CartPage'));
+const OrdersPage    = lazy(() => import('./pages/buyer/OrdersPage'));
+const InvoicePage   = lazy(() => import('./pages/buyer/InvoicePage'));
 
-// Admin pages
-const AdminDashboardPage = lazy(() => import('./pages/admin/DashboardPage'));
-const AdminUsersPage = lazy(() => import('./pages/admin/UsersPage'));
-const AdminStoresPage = lazy(() => import('./pages/admin/StoresPage'));
+// Admin
+const AdminDashboardPage  = lazy(() => import('./pages/admin/DashboardPage'));
+const AdminProductsPage   = lazy(() => import('./pages/admin/ProductsPage'));
+const AdminCategoriesPage = lazy(() => import('./pages/admin/CategoriesPage'));
+const AdminOrdersPage     = lazy(() => import('./pages/admin/OrdersPage'));
+const AdminUsersPage      = lazy(() => import('./pages/admin/UsersPage'));
+const AdminMessagesPage   = lazy(() => import('./pages/admin/MessagesPage'));
 
 const queryClient = new QueryClient();
 
 const Spinner = () => (
-  <div className="flex items-center justify-center min-h-screen">
-    <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+  <div className="flex items-center justify-center min-h-screen bg-slate-50">
+    <div className="w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
   </div>
 );
 
@@ -43,34 +42,33 @@ export default function App() {
         <QueryClientProvider client={queryClient}>
           <Suspense fallback={<Spinner />}>
             <Routes>
-              {/* Public routes */}
-              <Route path="/" element={<HomePage />} />
-              <Route path="/about" element={<AboutPage />} />
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
+              {/* Public */}
+              <Route path="/"            element={<HomePage />} />
+              <Route path="/about"       element={<AboutPage />} />
+              <Route path="/contact"     element={<ContactPage />} />
               <Route path="/products/:id" element={<ProductPage />} />
 
-              {/* Buyer routes */}
+              {/* Guest only — redirect logged-in users away */}
+              <Route element={<GuestRoute />}>
+                <Route path="/login"    element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
+              </Route>
+
+              {/* Buyer */}
               <Route element={<ProtectedRoute allowedRoles={['buyer']} />}>
-                <Route path="/cart" element={<CartPage />} />
-                <Route path="/orders" element={<OrdersPage />} />
-                <Route path="/invoice/:orderId" element={<InvoicePage />} />
+                <Route path="/cart"              element={<CartPage />} />
+                <Route path="/orders"            element={<OrdersPage />} />
+                <Route path="/invoice/:orderId"  element={<InvoicePage />} />
               </Route>
 
-              {/* Seller routes */}
-              <Route element={<ProtectedRoute allowedRoles={['seller']} />}>
-                <Route path="/seller/dashboard" element={<SellerDashboardPage />} />
-                <Route path="/seller/products" element={<SellerProductsPage />} />
-                <Route path="/seller/suppliers" element={<SellerSuppliersPage />} />
-                <Route path="/seller/orders" element={<SellerOrdersPage />} />
-                <Route path="/seller/settings" element={<SellerStoreSettingsPage />} />
-              </Route>
-
-              {/* Admin routes */}
-              <Route element={<ProtectedRoute allowedRoles={['superadmin']} />}>
-                <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
-                <Route path="/admin/users" element={<AdminUsersPage />} />
-                <Route path="/admin/stores" element={<AdminStoresPage />} />
+              {/* Admin */}
+              <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+                <Route path="/admin/dashboard"  element={<AdminDashboardPage />} />
+                <Route path="/admin/products"   element={<AdminProductsPage />} />
+                <Route path="/admin/categories" element={<AdminCategoriesPage />} />
+                <Route path="/admin/orders"     element={<AdminOrdersPage />} />
+                <Route path="/admin/users"      element={<AdminUsersPage />} />
+                <Route path="/admin/messages"   element={<AdminMessagesPage />} />
               </Route>
             </Routes>
           </Suspense>
