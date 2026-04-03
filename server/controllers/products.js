@@ -1,7 +1,11 @@
-const Product = require('../models/Product');
-const Category = require('../models/Category');
-const AppError = require('../utils/AppError');
-const { uploadToCloudinary, deleteCloudinaryImage, getPublicIdFromUrl } = require('../utils/cloudinaryHelper');
+const Product = require("../models/Product");
+const Category = require("../models/Category");
+const AppError = require("../utils/AppError");
+const {
+  uploadToCloudinary,
+  deleteCloudinaryImage,
+  getPublicIdFromUrl,
+} = require("../utils/cloudinaryHelper");
 
 const createProduct = async (req, res, next) => {
   try {
@@ -9,16 +13,21 @@ const createProduct = async (req, res, next) => {
     let imageUrls = [];
     if (req.files && req.files.length > 0) {
       imageUrls = await Promise.all(
-        req.files.map((f) => uploadToCloudinary(f.buffer, 'markethub/products', f.mimetype))
+        req.files.map((f) =>
+          uploadToCloudinary(f.buffer, "markethub/products", f.mimetype),
+        ),
       );
     }
 
     let categories = req.body.categories;
-    if (typeof categories === 'string') {
-      categories = categories.split(',').map((c) => c.trim()).filter(Boolean);
+    if (typeof categories === "string") {
+      categories = categories
+        .split(",")
+        .map((c) => c.trim())
+        .filter(Boolean);
     }
 
-    let categoryName = '';
+    let categoryName = "";
     if (categories && categories.length > 0) {
       const cat = await Category.findById(categories[0]);
       if (cat) categoryName = cat.name;
@@ -35,8 +44,14 @@ const createProduct = async (req, res, next) => {
       images: imageUrls,
     });
 
-    await product.populate('categories', 'name slug icon');
-    res.status(201).json({ status: 'success', data: { product }, message: 'Product created' });
+    await product.populate("categories", "name slug icon");
+    res
+      .status(201)
+      .json({
+        status: "success",
+        data: { product },
+        message: "Product created",
+      });
   } catch (err) {
     next(err);
   }
@@ -47,7 +62,7 @@ const getProducts = async (req, res, next) => {
     const query = { isActive: true, isDeleted: false };
 
     if (req.query.search) {
-      query.name = { $regex: req.query.search, $options: 'i' };
+      query.name = { $regex: req.query.search, $options: "i" };
     }
 
     if (req.query.category) {
@@ -61,12 +76,15 @@ const getProducts = async (req, res, next) => {
       }
     }
 
-    const products = await Product.find(query).populate('categories', 'name slug icon');
+    const products = await Product.find(query).populate(
+      "categories",
+      "name slug icon",
+    );
 
     res.status(200).json({
-      status: 'success',
+      status: "success",
       data: { products, count: products.length },
-      message: 'Products retrieved',
+      message: "Products retrieved",
     });
   } catch (err) {
     next(err);
@@ -79,11 +97,17 @@ const getProduct = async (req, res, next) => {
       _id: req.params.id,
       isActive: true,
       isDeleted: false,
-    }).populate('categories', 'name slug icon');
+    }).populate("categories", "name slug icon");
 
-    if (!product) return next(new AppError('Product not found.', 404));
+    if (!product) return next(new AppError("Product not found.", 404));
 
-    res.status(200).json({ status: 'success', data: { product }, message: 'Product retrieved' });
+    res
+      .status(200)
+      .json({
+        status: "success",
+        data: { product },
+        message: "Product retrieved",
+      });
   } catch (err) {
     next(err);
   }
@@ -91,20 +115,28 @@ const getProduct = async (req, res, next) => {
 
 const updateProduct = async (req, res, next) => {
   try {
-    const product = await Product.findOne({ _id: req.params.id, isDeleted: false });
-    if (!product) return next(new AppError('Product not found.', 404));
+    const product = await Product.findOne({
+      _id: req.params.id,
+      isDeleted: false,
+    });
+    if (!product) return next(new AppError("Product not found.", 404));
 
     // Upload new images if provided
     if (req.files && req.files.length > 0) {
       req.body.images = await Promise.all(
-        req.files.map((f) => uploadToCloudinary(f.buffer, 'markethub/products', f.mimetype))
+        req.files.map((f) =>
+          uploadToCloudinary(f.buffer, "markethub/products", f.mimetype),
+        ),
       );
     }
 
     if (req.body.categories) {
       let categories = req.body.categories;
-      if (typeof categories === 'string') {
-        categories = categories.split(',').map((c) => c.trim()).filter(Boolean);
+      if (typeof categories === "string") {
+        categories = categories
+          .split(",")
+          .map((c) => c.trim())
+          .filter(Boolean);
       }
       req.body.categories = categories;
       if (categories.length > 0) {
@@ -115,9 +147,15 @@ const updateProduct = async (req, res, next) => {
 
     Object.assign(product, req.body);
     await product.save();
-    await product.populate('categories', 'name slug icon');
+    await product.populate("categories", "name slug icon");
 
-    res.status(200).json({ status: 'success', data: { product }, message: 'Product updated' });
+    res
+      .status(200)
+      .json({
+        status: "success",
+        data: { product },
+        message: "Product updated",
+      });
   } catch (err) {
     next(err);
   }
@@ -125,8 +163,11 @@ const updateProduct = async (req, res, next) => {
 
 const deleteProduct = async (req, res, next) => {
   try {
-    const product = await Product.findOne({ _id: req.params.id, isDeleted: false });
-    if (!product) return next(new AppError('Product not found.', 404));
+    const product = await Product.findOne({
+      _id: req.params.id,
+      isDeleted: false,
+    });
+    if (!product) return next(new AppError("Product not found.", 404));
 
     for (const imageUrl of product.images) {
       const publicId = getPublicIdFromUrl(imageUrl);
@@ -137,10 +178,18 @@ const deleteProduct = async (req, res, next) => {
     product.deletedAt = new Date();
     await product.save();
 
-    res.status(200).json({ status: 'success', data: null, message: 'Product deleted' });
+    res
+      .status(200)
+      .json({ status: "success", data: null, message: "Product deleted" });
   } catch (err) {
     next(err);
   }
 };
 
-module.exports = { createProduct, getProducts, getProduct, updateProduct, deleteProduct };
+module.exports = {
+  createProduct,
+  getProducts,
+  getProduct,
+  updateProduct,
+  deleteProduct,
+};

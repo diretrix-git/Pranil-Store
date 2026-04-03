@@ -1,5 +1,5 @@
-import { createContext, useContext, useEffect, useState } from 'react';
-import api from '../api/axiosInstance';
+import { createContext, useContext, useEffect, useState } from "react";
+import api from "../api/axiosInstance";
 
 export const AuthContext = createContext(null);
 
@@ -9,7 +9,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     api
-      .get('/auth/me')
+      .get("/auth/me")
       .then((res) => {
         const u = res.data.data?.user ?? res.data.user ?? null;
         setUser(u);
@@ -22,7 +22,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   const logout = async () => {
-    await api.post('/auth/logout').catch(() => {});
+    await api.post("/auth/logout").catch(() => {});
     setUser(null);
   };
 

@@ -1,10 +1,10 @@
-const { body } = require('express-validator');
+const { body } = require("express-validator");
 
 const statusValidation = [
-  body('status')
+  body("status")
     .notEmpty()
-    .isIn(['pending', 'confirmed', 'processing', 'completed', 'cancelled'])
-    .withMessage('Invalid status value'),
+    .isIn(["pending", "confirmed", "processing", "completed", "cancelled"])
+    .withMessage("Invalid status value"),
 ];
 
 module.exports = { statusValidation };
