@@ -1,11 +1,12 @@
 const User = require('../models/User');
-const Store = require('../models/Store');
 const Order = require('../models/Order');
+const Product = require('../models/Product');
+const Contact = require('../models/Contact');
 const AppError = require('../utils/AppError');
 
 const getAllUsers = async (req, res, next) => {
   try {
-    const users = await User.find({ isDeleted: false }).select('-password');
+    const users = await User.find({ isDeleted: false, role: 'buyer' }).select('-password');
     res.status(200).json({ status: 'success', data: { users, count: users.length }, message: 'Users retrieved' });
   } catch (err) {
     next(err);
@@ -30,21 +31,26 @@ const toggleUserStatus = async (req, res, next) => {
 
 const getPlatformStats = async (req, res, next) => {
   try {
-    const [totalUsers, totalStores, totalOrders, revenueAgg] = await Promise.all([
-      User.countDocuments({ isDeleted: false }),
-      Store.countDocuments({ isDeleted: false }),
+    const [totalBuyers, totalProducts, totalOrders, revenueAgg, unreadMessages] = await Promise.all([
+      User.countDocuments({ isDeleted: false, role: 'buyer' }),
+      Product.countDocuments({ isDeleted: false }),
       Order.countDocuments({ isDeleted: false }),
       Order.aggregate([
         { $match: { isDeleted: false, status: { $ne: 'cancelled' } } },
         { $group: { _id: null, total: { $sum: '$totalAmount' } } },
       ]),
+      Contact.countDocuments({ isDeleted: false, isRead: false }),
     ]);
-
-    const totalRevenue = revenueAgg.length > 0 ? revenueAgg[0].total : 0;
 
     res.status(200).json({
       status: 'success',
-      data: { totalUsers, totalStores, totalOrders, totalRevenue },
+      data: {
+        totalBuyers,
+        totalProducts,
+        totalOrders,
+        totalRevenue: revenueAgg.length > 0 ? revenueAgg[0].total : 0,
+        unreadMessages,
+      },
       message: 'Stats retrieved',
     });
   } catch (err) {
