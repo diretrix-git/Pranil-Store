@@ -61,7 +61,8 @@ export default function AdminOrdersPage() {
             <p className="text-slate-400">No orders yet.</p>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+          <p className="text-xs text-slate-400 mb-3">Click any row to view order details.</p>
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[900px]">
                 <thead className="bg-slate-50 border-b border-slate-200">
@@ -73,17 +74,13 @@ export default function AdminOrdersPage() {
                 </thead>
                 <tbody>
                   {orders.map((order) => (
-                    <tr key={order._id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
+                    <tr key={order._id}
+                      onClick={() => setDetailOrder(order)}
+                      className="border-b border-slate-100 last:border-0 hover:bg-violet-50 transition-colors cursor-pointer">
                       <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-800">{order.orderNumber}</td>
                       <td className="px-4 py-3 font-medium text-slate-800">{order.buyerSnapshot?.name ?? '—'}</td>
                       <td className="px-4 py-3 text-slate-500">{order.buyerSnapshot?.phone || '—'}</td>
-                      <td className="px-4 py-3 text-slate-500 text-center">
-                        <button
-                          onClick={() => setDetailOrder(order)}
-                          className="text-violet-600 hover:text-violet-800 font-semibold underline underline-offset-2 text-xs">
-                          {order.items?.length ?? 0} item{order.items?.length !== 1 ? 's' : ''}
-                        </button>
-                      </td>
+                      <td className="px-4 py-3 text-slate-500 text-center">{order.items?.length ?? 0} item{order.items?.length !== 1 ? 's' : ''}</td>
                       <td className="px-4 py-3 font-semibold text-slate-800">${Number(order.totalAmount).toFixed(2)}</td>
                       <td className="px-4 py-3">
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_STYLES[order.status] ?? 'bg-slate-100 text-slate-600'}`}>
@@ -91,14 +88,13 @@ export default function AdminOrdersPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-slate-500 text-xs">{new Date(order.createdAt).toLocaleDateString()}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-2">
                           <motion.button whileTap={{ scale: 0.95 }}
                             onClick={() => openStatusModal(order)}
                             className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200 transition-colors whitespace-nowrap">
                             Update Status
                           </motion.button>
-                          {/* Print Invoice — always window.open, never navigate() or <Link> */}
                           <motion.button whileTap={{ scale: 0.95 }}
                             onClick={() => window.open(`/invoice/${order._id}`, '_blank')}
                             className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 transition-colors whitespace-nowrap">

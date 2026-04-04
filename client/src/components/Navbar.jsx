@@ -15,15 +15,12 @@ function timeAgo(iso) {
   return new Date(iso).toLocaleDateString();
 }
 
-// Notifications panel — rendered inside Navbar so it's on every admin page
 function NotificationsPanel({ open, onClose }) {
   const navigate = useNavigate();
-  const panelRef = useRef(null);
   const { notifications, markAllRead } = useNotificationStore();
 
   useEffect(() => { if (open) markAllRead(); }, [open, markAllRead]);
 
-  // Close on Escape
   useEffect(() => {
     const h = (e) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', h);
@@ -41,13 +38,12 @@ function NotificationsPanel({ open, onClose }) {
 
       <AnimatePresence>
         {open && (
-          <motion.div ref={panelRef}
+          <motion.div
             initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 28, stiffness: 300 }}
             className="fixed top-0 right-0 h-full w-full sm:w-96 bg-white shadow-2xl z-50 flex flex-col">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
               <div className="flex items-center gap-2">
-                <span className="text-xl">🌸</span>
                 <h2 className="font-black text-slate-900 text-lg">Notifications</h2>
                 {notifications.length > 0 && (
                   <span className="bg-slate-100 text-slate-500 text-xs font-bold px-2 py-0.5 rounded-full">
@@ -55,10 +51,7 @@ function NotificationsPanel({ open, onClose }) {
                   </span>
                 )}
               </div>
-              {/* Explicit close button — always works */}
-              <button
-                type="button"
-                onClick={onClose}
+              <button type="button" onClick={onClose}
                 className="text-slate-400 hover:text-slate-700 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 transition-colors text-lg font-bold">
                 ✕
               </button>
@@ -67,17 +60,14 @@ function NotificationsPanel({ open, onClose }) {
             <div className="flex-1 overflow-y-auto">
               {notifications.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center px-6">
-                  <p className="text-4xl mb-3">🌸</p>
+                  <p className="text-4xl mb-3">🔔</p>
                   <p className="text-slate-400 text-sm">No notifications yet.</p>
                   <p className="text-slate-300 text-xs mt-1">New orders and messages appear here.</p>
                 </div>
               ) : (
                 <div className="divide-y divide-slate-100">
                   {notifications.map((n, i) => (
-                    <motion.div key={`${n._id ?? n.orderId}-${i}`}
-                      initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.03 }}
-                      className="px-5 py-4 hover:bg-slate-50 transition-colors">
+                    <div key={`${n._id ?? n.orderId}-${i}`} className="px-5 py-4 hover:bg-slate-50 transition-colors">
                       {n.type === 'order' ? (
                         <>
                           <div className="flex items-start justify-between gap-2 mb-2">
@@ -132,7 +122,7 @@ function NotificationsPanel({ open, onClose }) {
                           </button>
                         </>
                       )}
-                    </motion.div>
+                    </div>
                   ))}
                 </div>
               )}
@@ -144,7 +134,6 @@ function NotificationsPanel({ open, onClose }) {
   );
 }
 
-// Admin-only bell button + hook wrapper
 function AdminNotificationBell() {
   useAdminNotifications();
   const [panelOpen, setPanelOpen] = useState(false);
@@ -152,12 +141,13 @@ function AdminNotificationBell() {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setPanelOpen((v) => !v)}
-        className="relative p-2 rounded-xl hover:bg-violet-50 transition-colors"
+      <button type="button" onClick={() => setPanelOpen((v) => !v)}
+        className="relative p-2 rounded-xl hover:bg-slate-100 transition-colors"
         aria-label="Notifications">
-        <span className="text-xl">🌸</span>
+        {/* Bell SVG icon */}
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+        </svg>
         {unreadCount > 0 && (
           <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-xs font-black w-4 h-4 rounded-full flex items-center justify-center leading-none">
             {unreadCount > 9 ? '9+' : unreadCount}
@@ -179,7 +169,6 @@ export default function Navbar() {
     navigate('/login');
   };
 
-  // Fetch cart item count (number of distinct products) for buyer badge
   const { data: cartData } = useQuery({
     queryKey: ['cart'],
     queryFn: async () => {
@@ -246,11 +235,9 @@ export default function Navbar() {
             ))}
           </div>
 
-          {/* Desktop right side */}
+          {/* Desktop right */}
           <div className="hidden md:flex items-center gap-2">
-            {/* Bell — admin only */}
             {user?.role === 'admin' && <AdminNotificationBell />}
-
             {user ? (
               <div className="flex items-center gap-3">
                 {roleBadge && (
