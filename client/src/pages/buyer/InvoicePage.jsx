@@ -16,7 +16,7 @@ export default function InvoicePage() {
     queryKey: ["invoice", orderId],
     queryFn: async () => {
       const res = await api.get(`/orders/${orderId}/invoice`);
-      return res.data.order ?? res.data;
+      return res.data.data?.order ?? res.data.order ?? res.data;
     },
   });
 
@@ -179,14 +179,9 @@ export default function InvoicePage() {
           </div>
         )}
 
-        {/* Print button - hidden on print */}
+        {/* Print button — admin only, hidden for buyers via @media print */}
         <div className="no-print mt-8 text-center">
-          <button
-            onClick={() => window.print()}
-            className="bg-blue-600 text-white px-6 py-2 rounded-md text-sm font-medium hover:bg-blue-700"
-          >
-            Print Invoice
-          </button>
+          <p className="text-sm text-gray-400">This invoice has been saved to your account.</p>
         </div>
       </div>
     </>

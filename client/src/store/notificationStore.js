@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 const useNotificationStore = create((set) => ({
-  notifications: [],   // newest first, session-only (resets on refresh)
+  notifications: [],  // { type: 'order'|'message', ...data, receivedAt }
   unreadCount: 0,
 
   addNotification: (notification) =>

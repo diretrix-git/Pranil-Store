@@ -15,8 +15,9 @@ const STATUS_STYLES = {
 
 export default function AdminOrdersPage() {
   const queryClient = useQueryClient();
-  const [statusModal, setStatusModal] = useState(null); // { orderId, current }
+  const [statusModal, setStatusModal] = useState(null);
   const [newStatus, setNewStatus] = useState('');
+  const [detailOrder, setDetailOrder] = useState(null); // order detail modal
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-orders'],
@@ -76,7 +77,13 @@ export default function AdminOrdersPage() {
                       <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-800">{order.orderNumber}</td>
                       <td className="px-4 py-3 font-medium text-slate-800">{order.buyerSnapshot?.name ?? '—'}</td>
                       <td className="px-4 py-3 text-slate-500">{order.buyerSnapshot?.phone || '—'}</td>
-                      <td className="px-4 py-3 text-slate-500 text-center">{order.items?.length ?? 0}</td>
+                      <td className="px-4 py-3 text-slate-500 text-center">
+                        <button
+                          onClick={() => setDetailOrder(order)}
+                          className="text-violet-600 hover:text-violet-800 font-semibold underline underline-offset-2 text-xs">
+                          {order.items?.length ?? 0} item{order.items?.length !== 1 ? 's' : ''}
+                        </button>
+                      </td>
                       <td className="px-4 py-3 font-semibold text-slate-800">${Number(order.totalAmount).toFixed(2)}</td>
                       <td className="px-4 py-3">
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_STYLES[order.status] ?? 'bg-slate-100 text-slate-600'}`}>
@@ -137,6 +144,82 @@ export default function AdminOrdersPage() {
                   disabled={updateStatus.isPending || newStatus === statusModal.current}
                   className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:opacity-90 disabled:opacity-50">
                   {updateStatus.isPending ? 'Saving...' : 'Save'}
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Order Detail Modal */}
+      <AnimatePresence>
+        {detailOrder && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={(e) => e.target === e.currentTarget && setDetailOrder(null)}>
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }} transition={{ duration: 0.2 }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <h2 className="text-lg font-black text-slate-900">{detailOrder.orderNumber}</h2>
+                  <p className="text-xs text-slate-400 mt-0.5">{new Date(detailOrder.createdAt).toLocaleString()}</p>
+                </div>
+                <button onClick={() => setDetailOrder(null)}
+                  className="text-slate-400 hover:text-slate-600 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 transition-colors font-bold">
+                  ✕
+                </button>
+              </div>
+
+              {/* Buyer info */}
+              <div className="bg-slate-50 rounded-xl p-4 mb-4">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Buyer</p>
+                <p className="font-semibold text-slate-800">{detailOrder.buyerSnapshot?.name ?? '—'}</p>
+                <p className="text-sm text-slate-500">{detailOrder.buyerSnapshot?.phone || '—'}</p>
+                <p className="text-sm text-slate-500">{detailOrder.buyerSnapshot?.email || '—'}</p>
+              </div>
+
+              {/* Items */}
+              <div className="mb-4">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Items Ordered</p>
+                <div className="space-y-2">
+                  {(detailOrder.items ?? []).map((item, i) => (
+                    <div key={i} className="flex items-center justify-between bg-white border border-slate-200 rounded-xl px-4 py-3">
+                      <div>
+                        <p className="font-semibold text-slate-800 text-sm">{item.name}</p>
+                        <p className="text-xs text-slate-400">{item.unit || 'pcs'} · ${Number(item.price).toFixed(2)} each</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-slate-500">× {item.quantity}</p>
+                        <p className="font-bold text-slate-900 text-sm">${Number(item.subtotal).toFixed(2)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Total */}
+              <div className="flex justify-between items-center bg-violet-50 rounded-xl px-4 py-3 mb-5">
+                <span className="font-bold text-slate-700">Total</span>
+                <span className="text-xl font-black text-violet-700">${Number(detailOrder.totalAmount).toFixed(2)}</span>
+              </div>
+
+              {detailOrder.notes && (
+                <div className="mb-5">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Notes</p>
+                  <p className="text-sm text-slate-600 bg-slate-50 rounded-xl px-4 py-3">{detailOrder.notes}</p>
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <button onClick={() => setDetailOrder(null)}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 hover:bg-slate-50">
+                  Close
+                </button>
+                <motion.button whileTap={{ scale: 0.97 }}
+                  onClick={() => window.open(`/invoice/${detailOrder._id}`, '_blank')}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:opacity-90">
+                  Print Invoice
                 </motion.button>
               </div>
             </motion.div>

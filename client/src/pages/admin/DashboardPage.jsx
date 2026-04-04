@@ -13,6 +13,8 @@ export default function AdminDashboardPage() {
       const res = await api.get("/admin/stats");
       return res.data.data ?? {};
     },
+    // Auto-refresh every 30s so unread message count stays current
+    refetchInterval: 30000,
   });
 
   const stats = data ?? {};

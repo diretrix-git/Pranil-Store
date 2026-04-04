@@ -5,28 +5,27 @@ const sendMessage = async (req, res, next) => {
   try {
     const { name, email, phone, subject, message } = req.body;
 
-    // Save to DB
-    const contact = await Contact.create({
-      name,
-      email,
-      phone,
-      subject,
-      message,
-    });
+    const contact = await Contact.create({ name, email, phone, subject, message });
 
-    // Log it so admin can see in server logs too
     logger.info(`📬 New contact message from ${name} <${email}>: ${subject}`);
 
+    // Emit real-time notification to admin_room
+    const io = req.app.get('io');
+    if (io) {
+      io.to('admin_room').emit('new_message', {
+        _id: contact._id,
+        name,
+        email,
+        phone,
+        subject,
+        receivedAt: contact.createdAt,
+      });
+    }
+
     res.status(201).json({
-      status: "success",
-      data: {
-        contact: {
-          _id: contact._id,
-          subject: contact.subject,
-          createdAt: contact.createdAt,
-        },
-      },
-      message: "Message sent successfully. We will get back to you soon.",
+      status: 'success',
+      data: { contact: { _id: contact._id, subject: contact.subject, createdAt: contact.createdAt } },
+      message: 'Message sent successfully. We will get back to you soon.',
     });
   } catch (err) {
     next(err);
