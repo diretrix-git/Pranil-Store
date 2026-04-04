@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute, { GuestRoute } from "./components/ProtectedRoute";
+import AdminLayout from "./layouts/AdminLayout";
 
 // Public
 const HomePage = lazy(() => import("./pages/buyer/HomePage"));
@@ -63,18 +64,14 @@ export default function App() {
 
               {/* Admin */}
               <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
-                <Route
-                  path="/admin/dashboard"
-                  element={<AdminDashboardPage />}
-                />
-                <Route path="/admin/products" element={<AdminProductsPage />} />
-                <Route
-                  path="/admin/categories"
-                  element={<AdminCategoriesPage />}
-                />
-                <Route path="/admin/orders" element={<AdminOrdersPage />} />
-                <Route path="/admin/users" element={<AdminUsersPage />} />
-                <Route path="/admin/messages" element={<AdminMessagesPage />} />
+                <Route element={<AdminLayout />}>
+                  <Route path="/admin/dashboard"  element={<AdminDashboardPage />} />
+                  <Route path="/admin/products"   element={<AdminProductsPage />} />
+                  <Route path="/admin/categories" element={<AdminCategoriesPage />} />
+                  <Route path="/admin/orders"     element={<AdminOrdersPage />} />
+                  <Route path="/admin/users"      element={<AdminUsersPage />} />
+                  <Route path="/admin/messages"   element={<AdminMessagesPage />} />
+                </Route>
               </Route>
             </Routes>
           </Suspense>
