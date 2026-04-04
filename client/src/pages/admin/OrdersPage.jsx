@@ -61,8 +61,9 @@ export default function AdminOrdersPage() {
             <p className="text-slate-400">No orders yet.</p>
           </div>
         ) : (
-          <p className="text-xs text-slate-400 mb-3">Click any row to view order details.</p>
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+          <>
+            <p className="text-xs text-slate-400 mb-3">Click any row to view order details.</p>
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[900px]">
                 <thead className="bg-slate-50 border-b border-slate-200">
@@ -108,6 +109,7 @@ export default function AdminOrdersPage() {
               </table>
             </div>
           </div>
+          </>
         )}
       </div>
 
