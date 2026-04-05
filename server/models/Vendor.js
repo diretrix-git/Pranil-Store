@@ -17,7 +17,6 @@ const vendorSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-vendorSchema.index({ slug: 1 });
 vendorSchema.index({ isActive: 1, isDeleted: 1 });
 
 vendorSchema.pre('save', function () {

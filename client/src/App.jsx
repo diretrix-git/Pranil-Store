@@ -10,6 +10,7 @@ const HomePage      = lazy(() => import("./pages/buyer/HomePage"));
 const AboutPage     = lazy(() => import("./pages/AboutPage"));
 const ContactPage   = lazy(() => import("./pages/ContactPage"));
 const ProductPage   = lazy(() => import("./pages/buyer/ProductPage"));
+const NotFoundPage  = lazy(() => import("./pages/NotFoundPage"));
 
 // Guest-only
 const LoginPage     = lazy(() => import("./pages/LoginPage"));
@@ -79,6 +80,9 @@ export default function App() {
                   <Route path="/admin/messages"   element={<AdminMessagesPage />} />
                 </Route>
               </Route>
+
+              {/* 404 */}
+              <Route path="*" element={<NotFoundPage />} />
             </Routes>
           </Suspense>
         </QueryClientProvider>

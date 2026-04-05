@@ -121,7 +121,8 @@ export default function HomePage() {
       <div className="max-w-7xl mx-auto px-4 py-8 flex gap-6">
 
         {/* ── Left Sidebar (25%) ─────────────────────────────────────────── */}
-        <aside className="hidden lg:block w-64 shrink-0 space-y-5">
+        <aside className="hidden lg:block w-64 shrink-0">
+          <div className="sticky top-20 space-y-5">
           {/* Search */}
           <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Search</label>
@@ -195,7 +196,7 @@ export default function HomePage() {
               <input type="range" min={0} max={5000} step={50} value={priceRange[1]}
                 onChange={(e) => { const v = Number(e.target.value); setPriceRange([priceRange[0], v]); setFilter('maxPrice', v < 5000 ? String(v) : ''); }}
                 className="w-full accent-violet-600" />
-              <p className="text-xs text-slate-400 text-center">${priceRange[0]} – ${priceRange[1]}</p>
+              <p className="text-xs text-slate-400 text-center">Rs. {priceRange[0]} – Rs. {priceRange[1]}</p>
             </div>
           </div>
 
@@ -205,6 +206,7 @@ export default function HomePage() {
               Clear all filters
             </button>
           )}
+          </div>
         </aside>
 
         {/* ── Main content (75%) ─────────────────────────────────────────── */}

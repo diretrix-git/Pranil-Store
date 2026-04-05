@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import api from "../../api/axiosInstance";
+import { formatRs } from "../../utils/formatCurrency";
 
 const Spinner = () => (
   <div className="flex justify-center py-16">
@@ -124,10 +125,10 @@ export default function InvoicePage() {
                 </td>
                 <td className="py-2 text-center">{item.quantity}</td>
                 <td className="py-2 text-right">
-                  ${Number(item.price).toFixed(2)}
+                  {formatRs(item.price)}
                 </td>
                 <td className="py-2 text-right">
-                  ${(Number(item.price) * item.quantity).toFixed(2)}
+                  {formatRs(Number(item.price) * item.quantity)}
                 </td>
               </tr>
             ))}
@@ -139,25 +140,23 @@ export default function InvoicePage() {
           <div className="w-64 text-sm">
             <div className="flex justify-between py-1">
               <span className="text-gray-600">Subtotal</span>
-              <span>
-                ${Number(order.subtotal ?? order.totalAmount).toFixed(2)}
-              </span>
+              <span>{formatRs(order.subtotal ?? order.totalAmount)}</span>
             </div>
             {order.discountAmount > 0 && (
               <div className="flex justify-between py-1 text-green-700">
                 <span>Discount</span>
-                <span>-${Number(order.discountAmount).toFixed(2)}</span>
+                <span>-{formatRs(order.discountAmount)}</span>
               </div>
             )}
             {order.taxAmount > 0 && (
               <div className="flex justify-between py-1">
                 <span className="text-gray-600">Tax</span>
-                <span>${Number(order.taxAmount).toFixed(2)}</span>
+                <span>{formatRs(order.taxAmount)}</span>
               </div>
             )}
             <div className="flex justify-between py-2 border-t-2 border-gray-300 font-bold text-base mt-1">
               <span>Total</span>
-              <span>${Number(order.totalAmount).toFixed(2)}</span>
+              <span>{formatRs(order.totalAmount)}</span>
             </div>
           </div>
         </div>

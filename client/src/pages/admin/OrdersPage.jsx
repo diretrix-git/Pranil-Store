@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../api/axiosInstance';
+import { formatRs } from '../../utils/formatCurrency';
 
 const STATUS_OPTIONS = ['pending', 'confirmed', 'processing', 'completed', 'cancelled'];
 const STATUS_STYLES = {
@@ -12,11 +13,31 @@ const STATUS_STYLES = {
   cancelled:  'bg-red-100 text-red-600',
 };
 
+const DATE_FILTERS = [
+  { label: 'All time',     value: 'all' },
+  { label: 'Today',        value: 'today' },
+  { label: 'Last 7 days',  value: '7d' },
+  { label: 'Last 30 days', value: '30d' },
+];
+
+function isWithin(dateStr, filter) {
+  if (filter === 'all') return true;
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now - d;
+  if (filter === 'today') return d.toDateString() === now.toDateString();
+  if (filter === '7d')  return diffMs <= 7  * 86400000;
+  if (filter === '30d') return diffMs <= 30 * 86400000;
+  return true;
+}
+
 export default function AdminOrdersPage() {
   const queryClient = useQueryClient();
   const [statusModal, setStatusModal] = useState(null);
   const [newStatus, setNewStatus] = useState('');
   const [detailOrder, setDetailOrder] = useState(null);
+  const [dateFilter, setDateFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-orders'],
@@ -28,14 +49,48 @@ export default function AdminOrdersPage() {
     onSuccess: () => { queryClient.invalidateQueries(['admin-orders']); setStatusModal(null); },
   });
 
-  const orders = Array.isArray(data) ? data : [];
+  const allOrders = Array.isArray(data) ? data : [];
+
+  const orders = useMemo(() => {
+    return allOrders.filter((o) => {
+      const dateOk = isWithin(o.createdAt, dateFilter);
+      const statusOk = statusFilter === 'all' || o.status === statusFilter;
+      return dateOk && statusOk;
+    });
+  }, [allOrders, dateFilter, statusFilter]);
 
   return (
     <>
       <div className="p-6 max-w-7xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-2xl font-black text-slate-900">All Orders</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Click any row to view full order details</p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-2xl font-black text-slate-900">All Orders</h1>
+            <p className="text-sm text-slate-500 mt-0.5">{orders.length} of {allOrders.length} orders · Click any row to view details</p>
+          </div>
+
+          {/* Filters */}
+          <div className="flex flex-wrap gap-2">
+            {/* Date filter */}
+            <div className="flex gap-1 bg-white border border-slate-200 rounded-lg p-1">
+              {DATE_FILTERS.map((f) => (
+                <button key={f.value} onClick={() => setDateFilter(f.value)}
+                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
+                    dateFilter === f.value ? 'bg-violet-600 text-white' : 'text-slate-500 hover:text-violet-600'
+                  }`}>
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Status filter */}
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+              className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-600 focus:outline-none focus:ring-2 focus:ring-violet-400">
+              <option value="all">All Status</option>
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {isLoading ? (
@@ -45,7 +100,7 @@ export default function AdminOrdersPage() {
         ) : orders.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-xl border border-slate-200">
             <p className="text-4xl mb-3">🛒</p>
-            <p className="text-slate-500">No orders yet.</p>
+            <p className="text-slate-500">{allOrders.length === 0 ? 'No orders yet.' : 'No orders match the selected filters.'}</p>
           </div>
         ) : (
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
@@ -66,7 +121,7 @@ export default function AdminOrdersPage() {
                       <td className="px-4 py-3 font-medium text-slate-800">{order.buyerSnapshot?.name ?? '—'}</td>
                       <td className="px-4 py-3 text-slate-500">{order.buyerSnapshot?.phone || '—'}</td>
                       <td className="px-4 py-3 text-slate-500 text-center">{order.items?.length ?? 0} item{order.items?.length !== 1 ? 's' : ''}</td>
-                      <td className="px-4 py-3 font-semibold text-slate-800">${Number(order.totalAmount).toFixed(2)}</td>
+                      <td className="px-4 py-3 font-semibold text-slate-800">{formatRs(order.totalAmount)}</td>
                       <td className="px-4 py-3">
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_STYLES[order.status] ?? 'bg-slate-100 text-slate-600'}`}>
                           {order.status}
@@ -155,11 +210,11 @@ export default function AdminOrdersPage() {
                     <div key={i} className="flex items-center justify-between bg-white border border-slate-200 rounded-xl px-4 py-3">
                       <div>
                         <p className="font-semibold text-slate-800 text-sm">{item.name}</p>
-                        <p className="text-xs text-slate-400">{item.unit || 'pcs'} · ${Number(item.price).toFixed(2)} each</p>
+                        <p className="text-xs text-slate-400">{item.unit || 'pcs'} · {formatRs(item.price)} each</p>
                       </div>
                       <div className="text-right">
                         <p className="text-xs text-slate-500">× {item.quantity}</p>
-                        <p className="font-bold text-slate-900 text-sm">${Number(item.subtotal).toFixed(2)}</p>
+                        <p className="font-bold text-slate-900 text-sm">{formatRs(item.subtotal)}</p>
                       </div>
                     </div>
                   ))}
@@ -167,7 +222,7 @@ export default function AdminOrdersPage() {
               </div>
               <div className="flex justify-between items-center bg-violet-50 rounded-xl px-4 py-3 mb-5">
                 <span className="font-bold text-slate-700">Total</span>
-                <span className="text-xl font-black text-violet-700">${Number(detailOrder.totalAmount).toFixed(2)}</span>
+                <span className="text-xl font-black text-violet-700">{formatRs(detailOrder.totalAmount)}</span>
               </div>
               {detailOrder.notes && (
                 <div className="mb-5">
