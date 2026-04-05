@@ -37,9 +37,10 @@ if (process.env.NODE_ENV === "development") {
 }
 
 // Routes
-app.use("/api/v1/auth", require("./routes/auth"));
+app.use("/api/v1/auth",       require("./routes/auth"));
 app.use("/api/v1/categories", require("./routes/categories"));
-app.use("/api/v1/products", require("./routes/products"));
+app.use("/api/v1/vendors",    require("./routes/vendors"));
+app.use("/api/v1/products",   require("./routes/products"));
 app.use("/api/v1/cart", require("./routes/cart"));
 app.use("/api/v1/orders", require("./routes/orders"));
 app.use("/api/v1/contact", require("./routes/contact"));

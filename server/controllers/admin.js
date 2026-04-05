@@ -2,6 +2,7 @@ const User = require("../models/User");
 const Order = require("../models/Order");
 const Product = require("../models/Product");
 const Contact = require("../models/Contact");
+const Vendor = require("../models/Vendor");
 const AppError = require("../utils/AppError");
 
 const getAllUsers = async (req, res, next) => {
@@ -47,37 +48,35 @@ const toggleUserStatus = async (req, res, next) => {
 
 const getPlatformStats = async (req, res, next) => {
   try {
-    const [
-      totalBuyers,
-      totalProducts,
-      totalOrders,
-      revenueAgg,
-      unreadMessages,
-    ] = await Promise.all([
-      User.countDocuments({ isDeleted: false, role: "buyer" }),
+    const [totalBuyers, totalProducts, totalOrders, revenueAgg, unreadMessages, totalVendors, pendingOrders, lowStockProducts] = await Promise.all([
+      User.countDocuments({ isDeleted: false, role: 'buyer' }),
       Product.countDocuments({ isDeleted: false }),
       Order.countDocuments({ isDeleted: false }),
       Order.aggregate([
-        { $match: { isDeleted: false, status: { $ne: "cancelled" } } },
-        { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+        { $match: { isDeleted: false, status: { $ne: 'cancelled' } } },
+        { $group: { _id: null, total: { $sum: '$totalAmount' } } },
       ]),
       Contact.countDocuments({ isDeleted: false, isRead: false }),
+      Vendor.countDocuments({ isDeleted: false, isActive: true }),
+      Order.countDocuments({ isDeleted: false, status: 'pending' }),
+      Product.countDocuments({ isDeleted: false, stock: { $gt: 0, $lt: 20 } }),
     ]);
 
     res.status(200).json({
-      status: "success",
+      status: 'success',
       data: {
         totalBuyers,
         totalProducts,
         totalOrders,
         totalRevenue: revenueAgg.length > 0 ? revenueAgg[0].total : 0,
         unreadMessages,
+        totalVendors,
+        pendingOrders,
+        lowStockProducts,
       },
-      message: "Stats retrieved",
+      message: 'Stats retrieved',
     });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 };
 
 module.exports = { getAllUsers, toggleUserStatus, getPlatformStats };

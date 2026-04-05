@@ -1,33 +1,28 @@
-const Product = require("../models/Product");
-const Category = require("../models/Category");
-const AppError = require("../utils/AppError");
-const {
-  uploadToCloudinary,
-  deleteCloudinaryImage,
-  getPublicIdFromUrl,
-} = require("../utils/cloudinaryHelper");
+const Product = require('../models/Product');
+const Category = require('../models/Category');
+const AppError = require('../utils/AppError');
+const { uploadToCloudinary, deleteCloudinaryImage, getPublicIdFromUrl } = require('../utils/cloudinaryHelper');
+
+const POPULATE_OPTS = [
+  { path: 'categories', select: 'name slug icon' },
+  { path: 'vendor', select: 'name slug description contactPerson email phone' },
+];
 
 const createProduct = async (req, res, next) => {
   try {
-    // Upload images to Cloudinary only if files were attached
     let imageUrls = [];
     if (req.files && req.files.length > 0) {
       imageUrls = await Promise.all(
-        req.files.map((f) =>
-          uploadToCloudinary(f.buffer, "markethub/products", f.mimetype),
-        ),
+        req.files.map((f) => uploadToCloudinary(f.buffer, 'markethub/products', f.mimetype))
       );
     }
 
     let categories = req.body.categories;
-    if (typeof categories === "string") {
-      categories = categories
-        .split(",")
-        .map((c) => c.trim())
-        .filter(Boolean);
+    if (typeof categories === 'string') {
+      categories = categories.split(',').map((c) => c.trim()).filter(Boolean);
     }
 
-    let categoryName = "";
+    let categoryName = '';
     if (categories && categories.length > 0) {
       const cat = await Category.findById(categories[0]);
       if (cat) categoryName = cat.name;
@@ -41,20 +36,13 @@ const createProduct = async (req, res, next) => {
       unit: req.body.unit,
       categories: categories || [],
       category: categoryName,
+      vendor: req.body.vendor || null,
       images: imageUrls,
     });
 
-    await product.populate("categories", "name slug icon");
-    res
-      .status(201)
-      .json({
-        status: "success",
-        data: { product },
-        message: "Product created",
-      });
-  } catch (err) {
-    next(err);
-  }
+    await product.populate(POPULATE_OPTS);
+    res.status(201).json({ status: 'success', data: { product }, message: 'Product created' });
+  } catch (err) { next(err); }
 };
 
 const getProducts = async (req, res, next) => {
@@ -62,81 +50,67 @@ const getProducts = async (req, res, next) => {
     const query = { isActive: true, isDeleted: false };
 
     if (req.query.search) {
-      query.name = { $regex: req.query.search, $options: "i" };
+      query.name = { $regex: req.query.search, $options: 'i' };
     }
 
     if (req.query.category) {
       const cat = await Category.findOne({
         $or: [{ slug: req.query.category }, { name: req.query.category }],
       });
-      if (cat) {
-        query.categories = cat._id;
-      } else {
-        query.category = req.query.category;
-      }
+      if (cat) query.categories = cat._id;
+      else query.category = req.query.category;
     }
 
-    const products = await Product.find(query).populate(
-      "categories",
-      "name slug icon",
-    );
+    if (req.query.vendor) {
+      const Vendor = require('../models/Vendor');
+      const vendor = await Vendor.findOne({
+        $or: [{ slug: req.query.vendor }, { _id: req.query.vendor.match(/^[a-f\d]{24}$/i) ? req.query.vendor : null }],
+      });
+      if (vendor) query.vendor = vendor._id;
+    }
+
+    if (req.query.minPrice || req.query.maxPrice) {
+      query.price = {};
+      if (req.query.minPrice) query.price.$gte = Number(req.query.minPrice);
+      if (req.query.maxPrice) query.price.$lte = Number(req.query.maxPrice);
+    }
+
+    const products = await Product.find(query).populate(POPULATE_OPTS);
 
     res.status(200).json({
-      status: "success",
+      status: 'success',
       data: { products, count: products.length },
-      message: "Products retrieved",
+      message: 'Products retrieved',
     });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 };
 
 const getProduct = async (req, res, next) => {
   try {
-    const product = await Product.findOne({
-      _id: req.params.id,
-      isActive: true,
-      isDeleted: false,
-    }).populate("categories", "name slug icon");
+    const product = await Product.findOne({ _id: req.params.id, isActive: true, isDeleted: false })
+      .populate(POPULATE_OPTS);
 
-    if (!product) return next(new AppError("Product not found.", 404));
+    if (!product) return next(new AppError('Product not found.', 404));
 
-    res
-      .status(200)
-      .json({
-        status: "success",
-        data: { product },
-        message: "Product retrieved",
-      });
-  } catch (err) {
-    next(err);
-  }
+    res.status(200).json({ status: 'success', data: { product }, message: 'Product retrieved' });
+  } catch (err) { next(err); }
 };
 
 const updateProduct = async (req, res, next) => {
   try {
-    const product = await Product.findOne({
-      _id: req.params.id,
-      isDeleted: false,
-    });
-    if (!product) return next(new AppError("Product not found.", 404));
+    const product = await Product.findOne({ _id: req.params.id, isDeleted: false });
+    if (!product) return next(new AppError('Product not found.', 404));
 
-    // Upload new images if provided
     if (req.files && req.files.length > 0) {
       req.body.images = await Promise.all(
-        req.files.map((f) =>
-          uploadToCloudinary(f.buffer, "markethub/products", f.mimetype),
-        ),
+        req.files.map((f) => uploadToCloudinary(f.buffer, 'markethub/products', f.mimetype))
       );
     }
 
     if (req.body.categories) {
       let categories = req.body.categories;
-      if (typeof categories === "string") {
-        categories = categories
-          .split(",")
-          .map((c) => c.trim())
-          .filter(Boolean);
+      if (typeof categories === 'string') {
+        categories = categories.split(',').map((c) => c.trim()).filter(Boolean);
       }
       req.body.categories = categories;
       if (categories.length > 0) {
@@ -147,27 +121,16 @@ const updateProduct = async (req, res, next) => {
 
     Object.assign(product, req.body);
     await product.save();
-    await product.populate("categories", "name slug icon");
+    await product.populate(POPULATE_OPTS);
 
-    res
-      .status(200)
-      .json({
-        status: "success",
-        data: { product },
-        message: "Product updated",
-      });
-  } catch (err) {
-    next(err);
-  }
+    res.status(200).json({ status: 'success', data: { product }, message: 'Product updated' });
+  } catch (err) { next(err); }
 };
 
 const deleteProduct = async (req, res, next) => {
   try {
-    const product = await Product.findOne({
-      _id: req.params.id,
-      isDeleted: false,
-    });
-    if (!product) return next(new AppError("Product not found.", 404));
+    const product = await Product.findOne({ _id: req.params.id, isDeleted: false });
+    if (!product) return next(new AppError('Product not found.', 404));
 
     for (const imageUrl of product.images) {
       const publicId = getPublicIdFromUrl(imageUrl);
@@ -178,18 +141,8 @@ const deleteProduct = async (req, res, next) => {
     product.deletedAt = new Date();
     await product.save();
 
-    res
-      .status(200)
-      .json({ status: "success", data: null, message: "Product deleted" });
-  } catch (err) {
-    next(err);
-  }
+    res.status(200).json({ status: 'success', data: null, message: 'Product deleted' });
+  } catch (err) { next(err); }
 };
 
-module.exports = {
-  createProduct,
-  getProducts,
-  getProduct,
-  updateProduct,
-  deleteProduct,
-};
+module.exports = { createProduct, getProducts, getProduct, updateProduct, deleteProduct };

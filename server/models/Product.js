@@ -15,6 +15,8 @@ const productSchema = new mongoose.Schema(
     // N:M — a product can belong to multiple categories
     categories: [{ type: mongoose.Schema.Types.ObjectId, ref: "Category" }],
     category: { type: String, trim: true }, // legacy string for quick filtering
+    // One-to-many: one vendor supplies many products
+    vendor: { type: mongoose.Schema.Types.ObjectId, ref: "Vendor", default: null },
     price: { type: Number, required: true, min: 0 },
     stock: {
       type: Number,
@@ -42,6 +44,7 @@ productSchema.pre("save", function () {
 
 productSchema.index({ categories: 1 });
 productSchema.index({ category: 1 });
+productSchema.index({ vendor: 1 });
 productSchema.index({ isActive: 1, isDeleted: 1 });
 
 module.exports = mongoose.model("Product", productSchema);
