@@ -16,51 +16,39 @@ export default function AdminOrdersPage() {
   const queryClient = useQueryClient();
   const [statusModal, setStatusModal] = useState(null);
   const [newStatus, setNewStatus] = useState('');
-  const [detailOrder, setDetailOrder] = useState(null); // order detail modal
+  const [detailOrder, setDetailOrder] = useState(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-orders'],
-    queryFn: async () => {
-      const res = await api.get('/orders');
-      return res.data.data?.orders ?? [];
-    },
+    queryFn: async () => { const res = await api.get('/orders'); return res.data.data?.orders ?? []; },
   });
 
   const updateStatus = useMutation({
     mutationFn: ({ orderId, status }) => api.patch(`/orders/${orderId}/status`, { status }),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['admin-orders']);
-      setStatusModal(null);
-    },
+    onSuccess: () => { queryClient.invalidateQueries(['admin-orders']); setStatusModal(null); },
   });
 
   const orders = Array.isArray(data) ? data : [];
 
-  const openStatusModal = (order) => {
-    setNewStatus(order.status);
-    setStatusModal({ orderId: order._id, current: order.status });
-  };
-
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-        <motion.h1 initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-          className="text-2xl sm:text-3xl font-black text-slate-900 mb-6">
-          All Orders
-        </motion.h1>
+    <>
+      <div className="p-6 max-w-7xl mx-auto">
+        <div className="mb-6">
+          <h1 className="text-2xl font-black text-slate-900">All Orders</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Click any row to view full order details</p>
+        </div>
 
         {isLoading ? (
           <div className="flex justify-center py-20">
-            <div className="w-10 h-10 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : orders.length === 0 ? (
-          <div className="text-center py-20">
-            <p className="text-5xl mb-4">🛒</p>
-            <p className="text-slate-400">No orders yet.</p>
+          <div className="text-center py-20 bg-white rounded-xl border border-slate-200">
+            <p className="text-4xl mb-3">🛒</p>
+            <p className="text-slate-500">No orders yet.</p>
           </div>
         ) : (
-          <>
-            <p className="text-xs text-slate-400 mb-3">Click any row to view order details.</p>
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[900px]">
                 <thead className="bg-slate-50 border-b border-slate-200">
@@ -70,11 +58,10 @@ export default function AdminOrdersPage() {
                     ))}
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-slate-100">
                   {orders.map((order) => (
-                    <tr key={order._id}
-                      onClick={() => setDetailOrder(order)}
-                      className="border-b border-slate-100 last:border-0 hover:bg-violet-50 transition-colors cursor-pointer">
+                    <tr key={order._id} onClick={() => setDetailOrder(order)}
+                      className="hover:bg-violet-50 transition-colors cursor-pointer">
                       <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-800">{order.orderNumber}</td>
                       <td className="px-4 py-3 font-medium text-slate-800">{order.buyerSnapshot?.name ?? '—'}</td>
                       <td className="px-4 py-3 text-slate-500">{order.buyerSnapshot?.phone || '—'}</td>
@@ -88,16 +75,14 @@ export default function AdminOrdersPage() {
                       <td className="px-4 py-3 text-slate-500 text-xs">{new Date(order.createdAt).toLocaleDateString()}</td>
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-2">
-                          <motion.button whileTap={{ scale: 0.95 }}
-                            onClick={() => openStatusModal(order)}
+                          <button onClick={() => { setNewStatus(order.status); setStatusModal({ orderId: order._id, current: order.status }); }}
                             className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200 transition-colors whitespace-nowrap">
                             Update Status
-                          </motion.button>
-                          <motion.button whileTap={{ scale: 0.95 }}
-                            onClick={() => window.open(`/invoice/${order._id}`, '_blank')}
+                          </button>
+                          <button onClick={() => window.open(`/invoice/${order._id}`, '_blank')}
                             className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 transition-colors whitespace-nowrap">
                             Print Invoice
-                          </motion.button>
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -106,7 +91,6 @@ export default function AdminOrdersPage() {
               </table>
             </div>
           </div>
-          </>
         )}
       </div>
 
@@ -124,16 +108,12 @@ export default function AdminOrdersPage() {
                 {STATUS_OPTIONS.map((s) => (
                   <button key={s} onClick={() => setNewStatus(s)}
                     className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${newStatus === s ? 'border-violet-500 bg-violet-50 text-violet-700' : 'border-slate-200 text-slate-600 hover:border-violet-300'}`}>
-                    <span className={`inline-block w-2 h-2 rounded-full mr-2 ${STATUS_STYLES[s]?.includes('amber') ? 'bg-amber-400' : STATUS_STYLES[s]?.includes('blue') ? 'bg-blue-400' : STATUS_STYLES[s]?.includes('violet') ? 'bg-violet-400' : STATUS_STYLES[s]?.includes('green') ? 'bg-green-400' : 'bg-red-400'}`} />
                     {s.charAt(0).toUpperCase() + s.slice(1)}
                   </button>
                 ))}
               </div>
               <div className="flex gap-3">
-                <button onClick={() => setStatusModal(null)}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 hover:bg-slate-50">
-                  Cancel
-                </button>
+                <button onClick={() => setStatusModal(null)} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 hover:bg-slate-50">Cancel</button>
                 <motion.button whileTap={{ scale: 0.97 }}
                   onClick={() => updateStatus.mutate({ orderId: statusModal.orderId, status: newStatus })}
                   disabled={updateStatus.isPending || newStatus === statusModal.current}
@@ -160,21 +140,14 @@ export default function AdminOrdersPage() {
                   <h2 className="text-lg font-black text-slate-900">{detailOrder.orderNumber}</h2>
                   <p className="text-xs text-slate-400 mt-0.5">{new Date(detailOrder.createdAt).toLocaleString()}</p>
                 </div>
-                <button onClick={() => setDetailOrder(null)}
-                  className="text-slate-400 hover:text-slate-600 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 transition-colors font-bold">
-                  ✕
-                </button>
+                <button onClick={() => setDetailOrder(null)} className="text-slate-400 hover:text-slate-600 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 font-bold">✕</button>
               </div>
-
-              {/* Buyer info */}
               <div className="bg-slate-50 rounded-xl p-4 mb-4">
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Buyer</p>
                 <p className="font-semibold text-slate-800">{detailOrder.buyerSnapshot?.name ?? '—'}</p>
                 <p className="text-sm text-slate-500">{detailOrder.buyerSnapshot?.phone || '—'}</p>
                 <p className="text-sm text-slate-500">{detailOrder.buyerSnapshot?.email || '—'}</p>
               </div>
-
-              {/* Items */}
               <div className="mb-4">
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Items Ordered</p>
                 <div className="space-y-2">
@@ -192,25 +165,18 @@ export default function AdminOrdersPage() {
                   ))}
                 </div>
               </div>
-
-              {/* Total */}
               <div className="flex justify-between items-center bg-violet-50 rounded-xl px-4 py-3 mb-5">
                 <span className="font-bold text-slate-700">Total</span>
                 <span className="text-xl font-black text-violet-700">${Number(detailOrder.totalAmount).toFixed(2)}</span>
               </div>
-
               {detailOrder.notes && (
                 <div className="mb-5">
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Notes</p>
                   <p className="text-sm text-slate-600 bg-slate-50 rounded-xl px-4 py-3">{detailOrder.notes}</p>
                 </div>
               )}
-
               <div className="flex gap-3">
-                <button onClick={() => setDetailOrder(null)}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 hover:bg-slate-50">
-                  Close
-                </button>
+                <button onClick={() => setDetailOrder(null)} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 hover:bg-slate-50">Close</button>
                 <motion.button whileTap={{ scale: 0.97 }}
                   onClick={() => window.open(`/invoice/${detailOrder._id}`, '_blank')}
                   className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:opacity-90">
@@ -221,6 +187,6 @@ export default function AdminOrdersPage() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </>
   );
 }
