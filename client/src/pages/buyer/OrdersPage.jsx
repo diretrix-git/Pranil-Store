@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import Navbar from "../../components/Navbar";
 import api from "../../api/axiosInstance";
+import { formatRs } from "../../utils/formatCurrency";
 
 const STATUS_STYLES = {
   pending: "bg-amber-100 text-amber-700",

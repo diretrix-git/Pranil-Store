@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../api/axiosInstance';
+import { formatRs } from '../../utils/formatCurrency';
 
 const EMPTY = { name: '', description: '', price: '', stock: '', unit: 'pcs', vendor: '' };
 

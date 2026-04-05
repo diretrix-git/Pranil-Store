@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import Navbar from "../../components/Navbar";
 import api from "../../api/axiosInstance";
+import { formatRs } from "../../utils/formatCurrency";
 
 const fadeUp = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } };
 
