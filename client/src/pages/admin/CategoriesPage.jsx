@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import Navbar from "../../components/Navbar";
 import Modal from "../../components/ui/DarkModal";
 import Input from "../../components/ui/DarkInput";
 import api from "../../api/axiosInstance";
@@ -62,9 +61,7 @@ export default function AdminCategoriesPage() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <Navbar />
-      <div className="max-w-4xl mx-auto px-4 py-8 sm:py-10">
+    <div className="p-6 max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <motion.h1
             initial={{ opacity: 0, y: -10 }}

@@ -189,14 +189,7 @@ export default function Navbar() {
         { to: '/contact', label: 'Contact' },
       ]
     : user?.role === 'admin'
-    ? [
-        { to: '/admin/dashboard', label: 'Dashboard' },
-        { to: '/admin/products', label: 'Products' },
-        { to: '/admin/categories', label: 'Categories' },
-        { to: '/admin/orders', label: 'Orders' },
-        { to: '/admin/users', label: 'Users' },
-        { to: '/admin/messages', label: 'Messages' },
-      ]
+    ? [] // Admin uses the sidebar in AdminLayout — no navbar links needed
     : [
         { to: '/', label: 'Home' },
         { to: '/about', label: 'About' },

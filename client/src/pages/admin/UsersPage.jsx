@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import Navbar from "../../components/Navbar";
 import api from "../../api/axiosInstance";
 
 export default function AdminUsersPage() {
@@ -22,9 +21,7 @@ export default function AdminUsersPage() {
   const users = Array.isArray(data) ? data : [];
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <Navbar />
-      <div className="max-w-6xl mx-auto px-4 py-8 sm:py-10">
+    <div className="p-6 max-w-6xl mx-auto">
         <motion.h1
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}

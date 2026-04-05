@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import Navbar from '../../components/Navbar';
 import api from '../../api/axiosInstance';
 
 const DATE_FILTERS = [
@@ -68,9 +67,7 @@ export default function AdminMessagesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <Navbar />
-      <div className="max-w-4xl mx-auto px-4 py-8 sm:py-10">
+    <div className="p-6 max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">

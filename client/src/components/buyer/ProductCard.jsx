@@ -55,10 +55,11 @@ export default function ProductCard({ product }) {
           <h3 className="font-semibold text-slate-800 text-sm mt-0.5 truncate">
             {product.name}
           </h3>
-          {product.store?.name && (
-            <p className="text-xs text-slate-400 mt-0.5 truncate">
-              by {product.store.name}
-            </p>
+          {product.vendor?.name && (
+            <p className="text-xs text-blue-600 font-medium mt-0.5 truncate">🏭 {product.vendor.name}</p>
+          )}
+          {!product.vendor && product.store?.name && (
+            <p className="text-xs text-slate-400 mt-0.5 truncate">by {product.store.name}</p>
           )}
           <div className="flex items-center gap-2 mt-2">
             <span className="text-base font-black text-slate-900">

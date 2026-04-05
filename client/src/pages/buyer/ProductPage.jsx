@@ -128,17 +128,20 @@ export default function ProductPage() {
 
             {/* Info panel */}
             <div className="p-6 sm:p-8 flex flex-col">
-              {/* Categories */}
+              {/* Categories + Vendor badge */}
               {product.categories?.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mb-3">
                   {product.categories.map((c) => (
-                    <span
-                      key={c._id ?? c}
-                      className="text-xs font-bold bg-violet-100 text-violet-700 px-2.5 py-1 rounded-full"
-                    >
+                    <span key={c._id ?? c}
+                      className="text-xs font-bold bg-violet-100 text-violet-700 px-2.5 py-1 rounded-full">
                       {c.icon} {c.name}
                     </span>
                   ))}
+                  {product.vendor?.name && (
+                    <span className="text-xs font-bold bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full">
+                      🏭 Supplied by: {product.vendor.name}
+                    </span>
+                  )}
                 </div>
               )}
 
@@ -243,6 +246,35 @@ export default function ProductPage() {
             </div>
           </div>
         </div>
+
+        {/* Vendor profile section */}
+        {product.vendor && (
+          <div className="mt-6 bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+            <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wide mb-4">About the Supplier</h2>
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-white font-black text-lg shrink-0">
+                {product.vendor.name?.[0]?.toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-slate-900">{product.vendor.name}</p>
+                {product.vendor.description && (
+                  <p className="text-sm text-slate-500 mt-1 leading-relaxed">{product.vendor.description}</p>
+                )}
+                <div className="flex flex-wrap gap-4 mt-3">
+                  {product.vendor.contactPerson && (
+                    <span className="text-xs text-slate-500">👤 {product.vendor.contactPerson}</span>
+                  )}
+                  {product.vendor.email && (
+                    <span className="text-xs text-slate-500">✉️ {product.vendor.email}</span>
+                  )}
+                  {product.vendor.phone && (
+                    <span className="text-xs text-slate-500">📞 {product.vendor.phone}</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

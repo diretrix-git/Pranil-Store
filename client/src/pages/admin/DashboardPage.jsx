@@ -1,164 +1,100 @@
-import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
-import Navbar from "../../components/Navbar";
-import api from "../../api/axiosInstance";
+import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import { AlertTriangle, Clock, Truck, TrendingUp, Package, Users, MessageSquare } from 'lucide-react';
+import api from '../../api/axiosInstance';
 
-const fadeUp = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } };
+function StatCard({ icon: Icon, label, value, sub, color, bg, border }) {
+  return (
+    <div className={`bg-white rounded-xl border ${border ?? 'border-slate-200'} p-5 shadow-sm`}>
+      <div className="flex items-start justify-between mb-3">
+        <div className={`p-2 rounded-lg ${bg}`}>
+          <Icon size={18} className={color} strokeWidth={2} />
+        </div>
+      </div>
+      <p className={`text-2xl font-black ${color} mb-0.5`}>{value}</p>
+      <p className="text-sm font-medium text-slate-600">{label}</p>
+      {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
+    </div>
+  );
+}
+
+function QuickLink({ to, icon: Icon, label, desc }) {
+  return (
+    <Link to={to}
+      className="flex items-center gap-3 p-4 bg-white rounded-xl border border-slate-200 hover:border-violet-200 hover:shadow-sm transition-all group">
+      <div className="p-2 rounded-lg bg-slate-50 group-hover:bg-violet-50 transition-colors">
+        <Icon size={16} className="text-slate-500 group-hover:text-violet-600 transition-colors" />
+      </div>
+      <div>
+        <p className="text-sm font-semibold text-slate-800 group-hover:text-violet-700 transition-colors">{label}</p>
+        <p className="text-xs text-slate-400">{desc}</p>
+      </div>
+    </Link>
+  );
+}
 
 export default function AdminDashboardPage() {
   const { data } = useQuery({
-    queryKey: ["admin-stats"],
-    queryFn: async () => {
-      const res = await api.get("/admin/stats");
-      return res.data.data ?? {};
-    },
-    // Auto-refresh every 30s so unread message count stays current
+    queryKey: ['admin-stats'],
+    queryFn: async () => { const res = await api.get('/admin/stats'); return res.data.data ?? {}; },
     refetchInterval: 30000,
   });
 
-  const stats = data ?? {};
-
-  const quickActions = [
-    {
-      to: "/admin/products",
-      icon: "📦",
-      label: "Add Product",
-      desc: "Create and manage products",
-      accent: "from-violet-500 to-indigo-500",
-    },
-    {
-      to: "/admin/categories",
-      icon: "🏷️",
-      label: "Add Category",
-      desc: "Manage product categories",
-      accent: "from-purple-500 to-violet-500",
-    },
-    {
-      to: "/admin/orders",
-      icon: "🛒",
-      label: "View Orders",
-      desc: "Manage all buyer orders",
-      accent: "from-orange-500 to-amber-500",
-    },
-    {
-      to: "/admin/messages",
-      icon: "💬",
-      label: "Messages",
-      desc: `${stats.unreadMessages ?? 0} unread`,
-      accent: "from-emerald-500 to-teal-500",
-      badge: stats.unreadMessages,
-    },
-    {
-      to: "/admin/users",
-      icon: "👥",
-      label: "Buyers",
-      desc: `${stats.totalBuyers ?? 0} registered`,
-      accent: "from-blue-500 to-cyan-500",
-    },
-  ];
+  const s = data ?? {};
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <Navbar />
-      <div className="max-w-5xl mx-auto px-4 py-8 sm:py-10">
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
-        >
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900">
-            Admin Dashboard
-          </h1>
-          <p className="text-slate-500 mt-1">Manage your marketplace.</p>
-        </motion.div>
+    <div className="p-6 max-w-6xl mx-auto">
+      <div className="mb-6">
+        <h1 className="text-2xl font-black text-slate-900">Dashboard</h1>
+        <p className="text-sm text-slate-500 mt-0.5">B2B Marketplace overview</p>
+      </div>
 
-        {/* Stats row */}
-        <motion.div
-          variants={{ show: { transition: { staggerChildren: 0.08 } } }}
-          initial="hidden"
-          animate="show"
-          className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8"
-        >
-          {[
-            {
-              icon: "📦",
-              label: "Products",
-              value: stats.totalProducts ?? 0,
-              color: "text-violet-700",
-              bg: "bg-violet-50",
-            },
-            {
-              icon: "🛒",
-              label: "Orders",
-              value: stats.totalOrders ?? 0,
-              color: "text-orange-700",
-              bg: "bg-orange-50",
-            },
-            {
-              icon: "👥",
-              label: "Buyers",
-              value: stats.totalBuyers ?? 0,
-              color: "text-blue-700",
-              bg: "bg-blue-50",
-            },
-            {
-              icon: "💰",
-              label: "Revenue",
-              value: `$${Number(stats.totalRevenue ?? 0).toFixed(0)}`,
-              color: "text-emerald-700",
-              bg: "bg-emerald-50",
-            },
-          ].map(({ icon, label, value, color, bg }, i) => (
-            <motion.div
-              key={label}
-              variants={fadeUp}
-              transition={{ delay: i * 0.08 }}
-              className={`${bg} rounded-2xl p-4 sm:p-5 border border-white shadow-sm`}
-            >
-              <p className="text-2xl mb-1">{icon}</p>
-              <p className={`text-xl sm:text-2xl font-black ${color}`}>
-                {value}
-              </p>
-              <p className="text-xs text-slate-500 font-medium mt-0.5">
-                {label}
-              </p>
-            </motion.div>
-          ))}
-        </motion.div>
+      {/* Alert row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <StatCard
+          icon={AlertTriangle} label="Low Stock" value={s.lowStockProducts ?? 0}
+          sub="Products below 20 units"
+          color="text-red-600" bg="bg-red-50" border="border-red-100" />
+        <StatCard
+          icon={Clock} label="Pending Orders" value={s.pendingOrders ?? 0}
+          sub="Awaiting fulfillment"
+          color="text-violet-600" bg="bg-violet-50" border="border-violet-100" />
+        <StatCard
+          icon={Truck} label="Active Vendors" value={s.totalVendors ?? 0}
+          sub="Supplier partners"
+          color="text-blue-600" bg="bg-blue-50" border="border-blue-100" />
+        <StatCard
+          icon={TrendingUp} label="Revenue" value={`$${Number(s.totalRevenue ?? 0).toFixed(0)}`}
+          sub="Total fulfilled volume"
+          color="text-emerald-600" bg="bg-emerald-50" border="border-emerald-100" />
+      </div>
 
-        {/* Quick actions */}
-        <motion.div
-          variants={{ show: { transition: { staggerChildren: 0.07 } } }}
-          initial="hidden"
-          animate="show"
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
-        >
-          {quickActions.map(({ to, icon, label, desc, accent, badge }) => (
-            <motion.div key={to} variants={fadeUp} whileHover={{ y: -3 }}>
-              <Link
-                to={to}
-                className="block bg-white border border-slate-200 rounded-2xl p-6 hover:shadow-md hover:border-violet-200 transition-all group relative overflow-hidden"
-              >
-                <div
-                  className={`absolute top-0 left-0 w-1 h-full bg-gradient-to-b ${accent} rounded-l-2xl`}
-                />
-                <div className="flex items-start justify-between">
-                  <span className="text-3xl">{icon}</span>
-                  {badge > 0 && (
-                    <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                      {badge}
-                    </span>
-                  )}
-                </div>
-                <p className="font-bold text-slate-800 group-hover:text-violet-600 transition-colors mt-3">
-                  {label}
-                </p>
-                <p className="text-xs text-slate-400 mt-1">{desc}</p>
-              </Link>
-            </motion.div>
-          ))}
-        </motion.div>
+      {/* Secondary stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+        {[
+          { label: 'Total Products', value: s.totalProducts ?? 0, color: 'text-slate-800' },
+          { label: 'Total Orders',   value: s.totalOrders ?? 0,   color: 'text-slate-800' },
+          { label: 'Buyers',         value: s.totalBuyers ?? 0,   color: 'text-slate-800' },
+          { label: 'Unread Messages',value: s.unreadMessages ?? 0, color: s.unreadMessages > 0 ? 'text-red-600' : 'text-slate-800' },
+        ].map(({ label, value, color }) => (
+          <div key={label} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm text-center">
+            <p className={`text-xl font-black ${color}`}>{value}</p>
+            <p className="text-xs text-slate-500 mt-0.5">{label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Quick actions */}
+      <div className="mb-2">
+        <h2 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-3">Quick Actions</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <QuickLink to="/admin/products"   icon={Package}       label="Add Product"    desc="Create new inventory item" />
+          <QuickLink to="/admin/vendors"    icon={Truck}         label="Add Vendor"     desc="Register a new supplier" />
+          <QuickLink to="/admin/categories" icon={Package}       label="Add Category"   desc="Manage product categories" />
+          <QuickLink to="/admin/orders"     icon={Clock}         label="View Orders"    desc={`${s.pendingOrders ?? 0} pending`} />
+          <QuickLink to="/admin/messages"   icon={MessageSquare} label="Messages"       desc={`${s.unreadMessages ?? 0} unread`} />
+          <QuickLink to="/admin/users"      icon={Users}         label="Buyers"         desc={`${s.totalBuyers ?? 0} registered`} />
+        </div>
       </div>
     </div>
   );
