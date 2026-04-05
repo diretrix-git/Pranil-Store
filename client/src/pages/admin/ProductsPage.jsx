@@ -165,7 +165,7 @@ export default function AdminProductsPage() {
                 ))}
 
                 <div className="grid grid-cols-2 gap-3">
-                  {[{ name: 'price', label: 'Price ($) *', type: 'number', placeholder: '0.00' }, { name: 'stock', label: 'Stock *', type: 'number', placeholder: '0' }].map(({ name, label, type, placeholder }) => (
+                  {[{ name: 'price', label: 'Price (Rs.) *', type: 'number', placeholder: '0.00' }, { name: 'stock', label: 'Stock *', type: 'number', placeholder: '0' }].map(({ name, label, type, placeholder }) => (
                     <div key={name}>
                       <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">{label}</label>
                       <input type={type} value={form[name]} onChange={(e) => setForm((f) => ({ ...f, [name]: e.target.value }))} placeholder={placeholder}

@@ -71,7 +71,6 @@ export default function OrdersPage() {
                     </span>
                   </div>
                   <p className="text-sm text-slate-400">
-                    {order.storeSnapshot?.name ?? "—"} ·{" "}
                     {new Date(order.createdAt).toLocaleDateString()}
                   </p>
                 </div>

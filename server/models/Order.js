@@ -27,18 +27,6 @@ const buyerSnapshotSchema = new mongoose.Schema(
   { _id: false },
 );
 
-const storeSnapshotSchema = new mongoose.Schema(
-  {
-    name: String,
-    phone: String,
-    email: String,
-    address: String,
-    logo: String,
-    invoiceNote: String,
-  },
-  { _id: false },
-);
-
 const orderSchema = new mongoose.Schema(
   {
     orderNumber: { type: String, unique: true },

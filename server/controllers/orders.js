@@ -55,7 +55,6 @@ const placeOrder = async (req, res, next) => {
 
     // Clear cart
     cart.items = [];
-    cart.store = null;
     await cart.save();
 
     // ── Emit real-time notification to admin_room ─────────────────────────────

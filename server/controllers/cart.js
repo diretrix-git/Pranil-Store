@@ -48,19 +48,6 @@ const addItem = async (req, res, next) => {
     let cart = await Cart.findOne({ buyer: req.user._id });
     if (!cart) cart = await Cart.create({ buyer: req.user._id, items: [] });
 
-    if (
-      cart.items.length > 0 &&
-      cart.store &&
-      cart.store.toString() !== product.store.toString()
-    ) {
-      return next(
-        new AppError(
-          "Your cart contains items from a different store. Please clear your cart first.",
-          409,
-        ),
-      );
-    }
-
     const existingIndex = cart.items.findIndex(
       (i) => i.product && i.product.toString() === productId.toString(),
     );
@@ -73,12 +60,10 @@ const addItem = async (req, res, next) => {
         price: product.price,
         image: product.images && product.images[0] ? product.images[0] : null,
         unit: product.unit,
-        store: product.store,
         quantity,
       });
     }
 
-    cart.store = product.store;
     await cart.save();
 
     res
@@ -143,7 +128,6 @@ const clearCart = async (req, res, next) => {
     const cart = await Cart.findOne({ buyer: req.user._id });
     if (cart) {
       cart.items = [];
-      cart.store = null;
       await cart.save();
     }
     res
