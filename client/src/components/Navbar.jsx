@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import useNotificationStore from '../store/notificationStore';
 import useAdminNotifications from '../hooks/useAdminNotifications';
 import api from '../api/axiosInstance';
+import { formatRs } from '../utils/formatCurrency';
 
 function timeAgo(iso) {
   const diff = Math.floor((Date.now() - new Date(iso)) / 1000);
@@ -89,7 +90,7 @@ function NotificationsPanel({ open, onClose }) {
                             ))}
                             <div className="flex justify-between text-xs font-bold text-slate-900 pt-1 border-t border-slate-200 mt-1">
                               <span>Total</span>
-                              <span>${Number(n.totalAmount).toFixed(2)}</span>
+                              <span>{formatRs(n.totalAmount)}</span>
                             </div>
                           </div>
                           <div className="flex gap-2">

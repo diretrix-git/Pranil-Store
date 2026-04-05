@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import Navbar from "../../components/Navbar";
 import api from "../../api/axiosInstance";
 import { useAuth } from "../../context/AuthContext";
+import { formatRs } from "../../utils/formatCurrency";
 
 export default function ProductPage() {
   const { id } = useParams();
@@ -152,7 +153,7 @@ export default function ProductPage() {
               {/* Price */}
               <div className="flex items-baseline gap-3 mb-4">
                 <span className="text-3xl font-black text-slate-900">
-                  ${price.toFixed(2)}
+                  {formatRs(price)}
                 </span>
                 <span className="text-sm text-slate-400">
                   per {product.unit || "pcs"}

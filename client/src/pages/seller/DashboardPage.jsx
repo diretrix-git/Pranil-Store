@@ -82,7 +82,7 @@ export default function SellerDashboardPage() {
           <StatCard
             icon="💰"
             label="Total Revenue"
-            value={`$${revenue.toFixed(2)}`}
+            value={formatRs(revenue)}
             color="text-emerald-700"
             bg="bg-emerald-50"
             delay={0.2}

@@ -123,7 +123,7 @@ export default function AdminProductsPage() {
                         {(!p.categories || p.categories.length === 0) && <span className="text-xs text-slate-400">{p.category || '—'}</span>}
                       </div>
                     </td>
-                    <td className="px-4 py-3 font-semibold text-slate-800">${Number(p.price).toFixed(2)}</td>
+                    <td className="px-4 py-3 font-semibold text-slate-800">{formatRs(p.price)}</td>
                     <td className="px-4 py-3"><StockBadge stock={p.stock} /></td>
                     <td className="px-4 py-3 text-right space-x-3">
                       <button onClick={() => openEdit(p)} className="text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors">Edit</button>

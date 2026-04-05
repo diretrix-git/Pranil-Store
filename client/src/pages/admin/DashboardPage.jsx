@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, Clock, Truck, TrendingUp, Package, Users, MessageSquare } from 'lucide-react';
 import api from '../../api/axiosInstance';
+import { formatRs } from '../../utils/formatCurrency';
 
 function StatCard({ icon: Icon, label, value, sub, color, bg, border }) {
   return (
@@ -64,7 +65,7 @@ export default function AdminDashboardPage() {
           sub="Supplier partners"
           color="text-blue-600" bg="bg-blue-50" border="border-blue-100" />
         <StatCard
-          icon={TrendingUp} label="Revenue" value={`$${Number(s.totalRevenue ?? 0).toFixed(0)}`}
+          icon={TrendingUp} label="Revenue" value={formatRs(s.totalRevenue ?? 0)}
           sub="Total fulfilled volume"
           color="text-emerald-600" bg="bg-emerald-50" border="border-emerald-100" />
       </div>

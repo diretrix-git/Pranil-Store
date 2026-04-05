@@ -76,7 +76,7 @@ export default function OrdersPage() {
                 </div>
                 <div className="flex items-center gap-4">
                   <span className="text-lg font-black text-slate-900">
-                    ${Number(order.totalAmount).toFixed(2)}
+                    {formatRs(order.totalAmount)}
                   </span>
                   <motion.button
                     whileTap={{ scale: 0.96 }}

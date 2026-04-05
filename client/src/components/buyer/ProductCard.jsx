@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
+import { formatRs } from "../../utils/formatCurrency";
 
 const cardVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -63,11 +64,11 @@ export default function ProductCard({ product }) {
           )}
           <div className="flex items-center gap-2 mt-2">
             <span className="text-base font-black text-slate-900">
-              ${Number(product.price).toFixed(2)}
+              {formatRs(product.price)}
             </span>
             {hasDiscount && (
               <span className="text-xs text-slate-400 line-through">
-                ${Number(product.compareAtPrice).toFixed(2)}
+                {formatRs(product.compareAtPrice)}
               </span>
             )}
           </div>
