@@ -4,11 +4,13 @@ Sentry.init({ dsn: process.env.SENTRY_DSN });
 
 import http from "http";
 import { Server } from "socket.io";
-import jwt from "jsonwebtoken";
+import { createClerkClient, verifyToken } from "@clerk/express";
 import app from "./app";
 import connectDB from "./config/db";
 import logger from "./utils/logger";
 import User from "./models/User";
+
+const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
 const PORT = process.env.PORT || 5000;
 
@@ -27,17 +29,15 @@ const io = new Server(httpServer, {
 
 io.use(async (socket, next) => {
   try {
-    const token = socket.handshake.headers.cookie
-      ?.split(";")
-      .find((c) => c.trim().startsWith("token="))
-      ?.split("=")[1];
-
+    // Clerk session token passed as auth header from client
+    const token = socket.handshake.auth?.token as string;
     if (!token) return next(new Error("Not authenticated"));
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as { id: string };
-    const user = await User.findById(decoded.id).select("-password");
+    const payload = await verifyToken(token, { secretKey: process.env.CLERK_SECRET_KEY });
+    const clerkUserId = payload.sub;
 
-    if (!user || user.isDeleted || !user.isActive) return next(new Error("User not found"));
+    const user = await User.findOne({ clerkId: clerkUserId, isDeleted: false });
+    if (!user || !user.isActive) return next(new Error("User not found"));
     if (user.role !== "admin") return next(new Error("Admins only"));
 
     (socket as any).user = user;

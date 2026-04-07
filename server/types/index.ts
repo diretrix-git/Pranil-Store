@@ -20,6 +20,7 @@ export interface IUser extends Document {
   address: IAddress;
   isDeleted: boolean;
   deletedAt: Date | null;
+  clerkId?: string | null;
   resetPasswordToken?: string;
   resetPasswordExpires?: Date;
   createdAt: Date;

@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { SignIn, SignUp } from "@clerk/react";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute, { GuestRoute } from "./components/ProtectedRoute";
 import AdminLayout from "./layouts/AdminLayout";
@@ -11,12 +12,6 @@ const AboutPage    = lazy(() => import("./pages/AboutPage"));
 const ContactPage  = lazy(() => import("./pages/ContactPage"));
 const ProductPage  = lazy(() => import("./pages/buyer/ProductPage"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
-
-// Guest-only
-const LoginPage          = lazy(() => import("./pages/LoginPage"));
-const RegisterPage       = lazy(() => import("./pages/RegisterPage"));
-const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
-const ResetPasswordPage  = lazy(() => import("./pages/ResetPasswordPage"));
 
 // Buyer
 const CartPage    = lazy(() => import("./pages/buyer/CartPage"));
@@ -34,9 +29,32 @@ const AdminMessagesPage   = lazy(() => import("./pages/admin/MessagesPage"));
 
 const queryClient = new QueryClient();
 
-const Spinner = () => (
-  <div className="flex items-center justify-center min-h-screen bg-slate-50">
-    <div className="w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
+// Page-level skeleton for lazy-loaded routes
+const PageSkeleton = () => (
+  <div className="min-h-screen bg-slate-50 animate-pulse">
+    <div className="h-16 bg-white border-b border-slate-200" />
+    <div className="max-w-6xl mx-auto px-4 py-8 space-y-4">
+      <div className="h-8 bg-slate-200 rounded w-1/3" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="aspect-square bg-slate-100" />
+            <div className="p-3 space-y-2">
+              <div className="h-3 bg-slate-200 rounded w-1/2" />
+              <div className="h-4 bg-slate-200 rounded w-3/4" />
+              <div className="h-4 bg-slate-200 rounded w-1/3" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+// Centered wrapper for Clerk's hosted UI components
+const ClerkPage = ({ children }: { children: React.ReactNode }) => (
+  <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
+    {children}
   </div>
 );
 
@@ -45,7 +63,7 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <QueryClientProvider client={queryClient}>
-          <Suspense fallback={<Spinner />}>
+          <Suspense fallback={<PageSkeleton />}>
             <Routes>
               {/* Public */}
               <Route path="/"             element={<HomePage />} />
@@ -53,14 +71,10 @@ export default function App() {
               <Route path="/contact"      element={<ContactPage />} />
               <Route path="/products/:id" element={<ProductPage />} />
 
-              {/* Password reset — public (no auth required) */}
-              <Route path="/forgot-password"        element={<ForgotPasswordPage />} />
-              <Route path="/reset-password/:token"  element={<ResetPasswordPage />} />
-
-              {/* Guest only */}
+              {/* Clerk hosted auth — replaces LoginPage / RegisterPage */}
               <Route element={<GuestRoute />}>
-                <Route path="/login"    element={<LoginPage />} />
-                <Route path="/register" element={<RegisterPage />} />
+                <Route path="/sign-in/*" element={<ClerkPage><SignIn routing="path" path="/sign-in" /></ClerkPage>} />
+                <Route path="/sign-up/*" element={<ClerkPage><SignUp routing="path" path="/sign-up" /></ClerkPage>} />
               </Route>
 
               {/* Invoice — buyer + admin */}

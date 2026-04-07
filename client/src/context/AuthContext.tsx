@@ -1,38 +1,58 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { useUser, useAuth as useClerkAuth } from "@clerk/react";
 import api from "../api/axiosInstance";
 import { IUser } from "../types";
 
 interface AuthContextValue {
   user: IUser | null;
-  setUser: (user: IUser | null) => void;
   loading: boolean;
-  logout: () => Promise<void>;
+  clerkLoaded: boolean;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<IUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { isLoaded, isSignedIn, user: clerkUser } = useUser();
+  const { getToken } = useClerkAuth();
+  const [dbUser, setDbUser] = useState<IUser | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
-    api
-      .get("/auth/me")
-      .then((res) => {
-        const u = res.data.data?.user ?? res.data.user ?? null;
-        setUser(u);
-      })
-      .catch(() => setUser(null))
-      .finally(() => setLoading(false));
-  }, []);
+    if (!isLoaded) return;
 
-  const logout = async (): Promise<void> => {
-    await api.post("/auth/logout").catch(() => {});
-    setUser(null);
-  };
+    if (!isSignedIn) {
+      setDbUser(null);
+      return;
+    }
+
+    // Sync Clerk user into MongoDB and get role
+    const sync = async () => {
+      setSyncing(true);
+      try {
+        const token = await getToken();
+        const res = await api.get("/auth/me", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const u = res.data.data?.user ?? null;
+        setDbUser(u);
+      } catch {
+        setDbUser(null);
+      } finally {
+        setSyncing(false);
+      }
+    };
+
+    sync();
+  }, [isLoaded, isSignedIn, clerkUser?.id]);
 
   return (
-    <AuthContext.Provider value={{ user, setUser, loading, logout }}>
+    <AuthContext.Provider
+      value={{
+        user: dbUser,
+        loading: !isLoaded || syncing,
+        clerkLoaded: isLoaded,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

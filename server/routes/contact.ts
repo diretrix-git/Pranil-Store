@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { sendMessage, getMessages, markRead } from "../controllers/contact";
-import { protect } from "../middleware/auth";
+import { requireAuth, protect } from "../middleware/auth";
 import { restrictTo } from "../middleware/restrictTo";
 import { body } from "express-validator";
 import { validate } from "../middleware/validate";
@@ -15,7 +15,7 @@ const contactValidation = [
 ];
 
 router.post("/", contactValidation, validate, sendMessage);
-router.get("/", protect, restrictTo("admin"), getMessages);
-router.patch("/:id/read", protect, restrictTo("admin"), markRead);
+router.get("/", requireAuth, protect, restrictTo("admin"), getMessages);
+router.patch("/:id/read", requireAuth, protect, restrictTo("admin"), markRead);
 
 export default router;

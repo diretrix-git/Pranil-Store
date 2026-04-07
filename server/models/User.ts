@@ -17,6 +17,7 @@ const userSchema = new Schema<IUser>(
     address: { type: addressSchema, default: () => ({}) },
     isDeleted: { type: Boolean, default: false },
     deletedAt: { type: Date, default: null },
+    clerkId: { type: String, default: null, index: true },
     resetPasswordToken: { type: String, select: false },
     resetPasswordExpires: { type: Date, select: false },
   },
