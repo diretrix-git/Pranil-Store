@@ -11,8 +11,11 @@
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "moduleResolution": "node",
-    "ignoreDeprecations": "6.0"
+    "moduleResolution": "bundler"
+  },
+  "ts-node": {
+    "transpileOnly": true,
+    "files": true
   },
   "include": ["./**/*.ts"],
   "exclude": ["node_modules", "dist"]
