@@ -1,19 +1,22 @@
-# MarketHub — Multi-Vendor E-Commerce Platform
+# MarketHub — B2B Multi-Vendor Marketplace
 
-A full-stack multi-vendor marketplace built with the **MERN stack** (MongoDB Atlas, Express, React/Vite, Node.js). Multiple sellers each manage their own store; buyers browse products, manage a cart, place orders, and print invoices. A superadmin oversees the entire platform.
+A production-ready full-stack B2B marketplace built with the **MERN stack** + TypeScript. Admins manage products, vendors, categories, orders and buyers. Buyers browse, cart, and order. Real-time notifications, email queues, Redis caching, and rate limiting included.
 
 ---
 
 ## Tech Stack
 
-| Layer      | Technology                                                                                |
-| ---------- | ----------------------------------------------------------------------------------------- |
-| Frontend   | React 18 + Vite, React Router v7, TanStack Query, Zustand, Framer Motion, Tailwind CSS v4 |
-| Backend    | Node.js, Express 4, Mongoose                                                              |
-| Database   | MongoDB Atlas                                                                             |
-| Images     | Cloudinary                                                                                |
-| Auth       | JWT in httpOnly cookies                                                                   |
-| Monitoring | Sentry, Winston                                                                           |
+| Layer          | Technology                                                                 |
+| -------------- | -------------------------------------------------------------------------- |
+| Frontend       | React 18 + Vite, TypeScript, React Router v7, TanStack Query, Zustand, Framer Motion, Tailwind CSS v4 |
+| Backend        | Node.js, Express 4, TypeScript, Mongoose                                   |
+| Database       | MongoDB Atlas                                                              |
+| Auth           | Clerk (hosted sign-in/sign-up, session tokens)                             |
+| Cache          | Upstash Redis (products, categories, vendors)                              |
+| Email Queue    | BullMQ + Upstash Redis                                                     |
+| Email Delivery | Nodemailer (Gmail)                                                         |
+| File Storage   | Cloudinary                                                                 |
+| Monitoring     | Sentry, Winston                                                            |
 
 ---
 
@@ -21,25 +24,37 @@ A full-stack multi-vendor marketplace built with the **MERN stack** (MongoDB Atl
 
 ```
 markethub/
-├── client/                  # React/Vite frontend
+├── client/                     # React/Vite frontend (TypeScript)
 │   ├── src/
-│   │   ├── api/             # Axios instance
-│   │   ├── components/      # Shared UI components
-│   │   ├── context/         # AuthContext
-│   │   ├── pages/           # Route pages (buyer / seller / admin)
-│   │   └── App.jsx
+│   │   ├── api/                # Axios instance (auto-attaches Clerk token)
+│   │   ├── components/         # Navbar, ProtectedRoute, ProductCard, etc.
+│   │   ├── context/            # AuthContext (Clerk → MongoDB sync)
+│   │   ├── hooks/              # useAdminNotifications
+│   │   ├── layouts/            # AdminLayout (persistent sidebar)
+│   │   ├── pages/
+│   │   │   ├── admin/          # Dashboard, Products, Categories, Vendors, Orders, Users, Messages
+│   │   │   └── buyer/          # Home, Product, Cart, Orders, Invoice
+│   │   ├── store/              # Zustand notification store
+│   │   ├── types/              # Shared TypeScript interfaces
+│   │   └── utils/              # formatCurrency, socket
+│   ├── .env.example
+│   └── tsconfig.json
+│
+├── server/                     # Express backend (TypeScript)
+│   ├── config/                 # DB, Cloudinary, Redis (Upstash)
+│   ├── controllers/            # Route handlers with caching
+│   ├── middleware/             # Clerk auth, rate limiter, error handler
+│   ├── models/                 # Mongoose schemas (User, Product, Order, Cart, Vendor, Category, Contact)
+│   ├── queues/                 # BullMQ email queue + worker
+│   ├── routes/                 # Express routers
+│   ├── scripts/                # DB migration scripts
+│   ├── types/                  # Shared TypeScript interfaces
+│   ├── utils/                  # Logger, AppError, Cloudinary helpers, Mailer
+│   ├── validators/             # express-validator chains
+│   ├── seed.ts                 # Full database seed (categories + admin + buyer + products)
 │   └── .env.example
 │
-└── server/                  # Express backend
-    ├── config/              # DB + Cloudinary config
-    ├── controllers/         # Route handlers
-    ├── middleware/          # Auth, rate limiter, validator, error handler
-    ├── models/              # Mongoose schemas
-    ├── routes/              # Express routers
-    ├── utils/               # Logger, AppError, Cloudinary helpers
-    ├── validators/          # express-validator chains
-    ├── seed.js              # Database seed script
-    └── .env.example
+└── nginx.conf                  # Nginx reverse proxy config (for VPS deployment)
 ```
 
 ---
@@ -48,176 +63,245 @@ markethub/
 
 ### Prerequisites
 
-- Node.js 18+
-- MongoDB Atlas account (or local MongoDB)
+- Node.js 20+
+- MongoDB Atlas account
 - Cloudinary account
+- Clerk account (https://clerk.com)
+- Upstash Redis account (https://upstash.com)
 
-### 1. Clone the repo
+### 1. Clone
 
 ```bash
 git clone https://github.com/your-username/markethub.git
 cd markethub
 ```
 
-### 2. Configure environment variables
-
-**Server:**
+### 2. Server environment
 
 ```bash
 cd server
 cp .env.example .env
-# Edit .env with your values
 ```
 
-**Client:**
+Fill in `server/.env`:
+
+```env
+PORT=5000
+NODE_ENV=development
+MONGO_URI=mongodb+srv://...
+CLIENT_URL=http://localhost:5173
+
+# Clerk
+CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
+
+# Cloudinary
+CLOUDINARY_CLOUD_NAME=...
+CLOUDINARY_API_KEY=...
+CLOUDINARY_API_SECRET=...
+
+# Gmail (Nodemailer — requires 2FA App Password)
+GMAIL_USER=you@gmail.com
+GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
+GMAIL_FROM_NAME=MarketHub
+
+# Upstash Redis
+UPSTASH_REDIS_REST_URL=https://...upstash.io
+UPSTASH_REDIS_REST_TOKEN=...
+
+# Admin seed
+ADMIN_EMAIL=admin@yourdomain.com
+ADMIN_PASSWORD=StrongPass@123
+ADMIN_NAME=Admin
+```
+
+### 3. Client environment
 
 ```bash
 cd client
 cp .env.example .env
-# Edit .env with your values
 ```
 
-### 3. Install dependencies
+```env
+VITE_API_URL=http://localhost:5000/api/v1
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
+```
+
+### 4. Install dependencies
 
 ```bash
-# Server
 cd server && npm install
-
-# Client
-cd client && npm install
+cd ../client && npm install
 ```
 
-### 4. Seed the database
+### 5. Seed the database
 
 ```bash
 cd server
-node seed.js
+npm run seed
 ```
 
-This creates all categories, a superadmin, a demo seller with a store, a demo buyer, and 3 sample products — all in MongoDB Atlas.
+Creates: 6 categories, 1 admin, 1 demo buyer, 3 sample products.
 
-To wipe and re-seed:
+To wipe and re-seed: `npm run seed:fresh`
 
-```bash
-node seed.js --fresh
+### 6. Set admin role in Clerk
+
+After seeding, go to your **Clerk Dashboard → Users → [admin user] → Edit → Public Metadata** and set:
+
+```json
+{ "role": "admin" }
 ```
 
-### 5. Run the app
+### 7. Run
 
 ```bash
 # Terminal 1 — Backend
-cd server && node server.js
+cd server && npm run dev
 
 # Terminal 2 — Frontend
 cd client && npm run dev
 ```
 
-Frontend: http://localhost:5173  
-Backend API: http://localhost:5000/api/v1
+- Frontend: http://localhost:5173
+- API: http://localhost:5000/api/v1
 
 ---
 
-## Default Accounts (after seeding)
+## Roles
 
-| Role       | Email                | Password    |
-| ---------- | -------------------- | ----------- |
-| Superadmin | admin@markethub.com  | Admin@1234  |
-| Seller     | seller@markethub.com | Seller@1234 |
-| Buyer      | buyer@markethub.com  | Buyer@1234  |
+| Role      | Capabilities                                                                 |
+| --------- | ---------------------------------------------------------------------------- |
+| **Buyer** | Browse products, manage cart, place orders, view invoices                    |
+| **Admin** | Manage products, categories, vendors, orders, users, messages; view stats    |
 
-> **Note:** Superadmin accounts can only be created via the seed script, not through the registration form.
-
----
-
-## User Roles
-
-| Role           | Capabilities                                                    |
-| -------------- | --------------------------------------------------------------- |
-| **Buyer**      | Browse products, manage cart, place orders, view/print invoices |
-| **Seller**     | Manage own store, products, suppliers, and incoming orders      |
-| **Superadmin** | View all users, stores, orders; activate/deactivate accounts    |
+Admin accounts are created via Clerk Dashboard (set `publicMetadata.role = "admin"`).
 
 ---
 
 ## API Overview
 
-All routes are prefixed with `/api/v1`.
+All routes prefixed with `/api/v1`.
 
-| Resource   | Endpoints                                                                                                    |
-| ---------- | ------------------------------------------------------------------------------------------------------------ |
-| Auth       | `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`                               |
-| Categories | `GET /categories`                                                                                            |
-| Products   | `GET /products`, `GET /products/:id`, `POST /products`, `PUT /products/:id`, `DELETE /products/:id`          |
-| Cart       | `GET /cart`, `POST /cart/add`, `PATCH /cart/item/:id`, `DELETE /cart/item/:id`, `DELETE /cart/clear`         |
-| Orders     | `POST /orders`, `GET /orders/my`, `GET /orders/store`, `PATCH /orders/:id/status`, `GET /orders/:id/invoice` |
-| Suppliers  | `GET /suppliers`, `POST /suppliers`, `PUT /suppliers/:id`, `DELETE /suppliers/:id`                           |
-| Stores     | `GET /stores/me`, `PUT /stores/me`, `GET /stores`, `PATCH /stores/:id/status`                                |
-| Admin      | `GET /admin/users`, `PATCH /admin/users/:id/status`, `GET /admin/stats`                                      |
-
----
-
-## Data Storage
-
-| Data                                               | Where                                                                 |
-| -------------------------------------------------- | --------------------------------------------------------------------- |
-| Users, stores, products, orders, carts, categories | MongoDB Atlas (`pranilStore` database)                                |
-| Product images, store logos                        | Cloudinary (`/stores/{storeId}/products/`, `/stores/{storeId}/logo/`) |
+| Resource   | Key Endpoints                                                                                     |
+| ---------- | ------------------------------------------------------------------------------------------------- |
+| Auth       | `GET /auth/me`                                                                                    |
+| Categories | `GET /categories`, `POST /categories`, `DELETE /categories/:id`                                   |
+| Vendors    | `GET /vendors`, `GET /vendors/all`, `POST /vendors`, `PUT /vendors/:id`, `DELETE /vendors/:id`    |
+| Products   | `GET /products`, `GET /products/:id`, `POST /products`, `PUT /products/:id`, `DELETE /products/:id` |
+| Cart       | `GET /cart`, `POST /cart/add`, `PATCH /cart/item/:id`, `DELETE /cart/item/:id`, `DELETE /cart/clear` |
+| Orders     | `POST /orders`, `GET /orders/my`, `GET /orders`, `PATCH /orders/:id/status`, `GET /orders/:id/invoice` |
+| Contact    | `POST /contact`, `GET /contact`, `PATCH /contact/:id/read`                                        |
+| Admin      | `GET /admin/users`, `PATCH /admin/users/:id/status`, `GET /admin/stats`                           |
 
 ---
 
-## Security
+## Infrastructure
 
-- JWT stored in **httpOnly, Secure, SameSite=Strict** cookies — never in localStorage
-- Passwords hashed with **bcrypt** (salt rounds: 12)
-- **helmet**, **express-mongo-sanitize**, **hpp** middleware applied globally
-- Strict **CORS** — only allows the configured `CLIENT_URL`
-- Rate limiting per route group (disabled in development)
-- Sellers can only access their own store's data — enforced on every request
-
----
-
-## Category System (N:M)
-
-Products and categories have a **many-to-many** relationship:
-
-- One product can belong to multiple categories
-- One category can contain many products
-- Categories are stored in MongoDB and fetched dynamically in the UI
+| Feature          | Implementation                                                                 |
+| ---------------- | ------------------------------------------------------------------------------ |
+| Rate Limiting    | `express-rate-limit` — auth: 10/15min, orders: 5/min, uploads: 20/10min, global: 200/min |
+| DB Indexing      | Mongoose indexes on all query-heavy fields (categories, vendor, buyer+createdAt, isActive/isDeleted) |
+| Caching          | Upstash Redis — categories (1hr), vendors (10min), products (2min), single product (5min) |
+| Message Queue    | BullMQ — all emails queued with 3 retries + exponential backoff                |
+| Load Balancing   | Nginx `upstream` block (see `nginx.conf`) — `least_conn` strategy              |
+| Reverse Proxy    | Nginx — SSL termination, static file serving, WebSocket proxying               |
+| CAP Theorem      | MongoDB Atlas = CP (Consistency + Partition Tolerance) — correct for B2B order data |
 
 ---
 
-## Environment Variables
+## Email Notifications
 
-### Server (`server/.env`)
+Buyers receive emails for:
+- Order placed (pending)
+- Order confirmed
+- Order completed
+- Order cancelled
 
-| Variable                | Description                                |
-| ----------------------- | ------------------------------------------ |
-| `PORT`                  | Server port (default: 5000)                |
-| `NODE_ENV`              | `development` or `production`              |
-| `MONGO_URI`             | MongoDB Atlas connection string            |
-| `JWT_SECRET`            | Secret key (min 32 chars)                  |
-| `JWT_EXPIRES_IN`        | Token expiry (e.g. `7d`)                   |
-| `CLIENT_URL`            | Frontend URL for CORS                      |
-| `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name                      |
-| `CLOUDINARY_API_KEY`    | Cloudinary API key                         |
-| `CLOUDINARY_API_SECRET` | Cloudinary API secret                      |
-| `SENTRY_DSN`            | Sentry DSN for error monitoring (optional) |
-
-### Client (`client/.env`)
-
-| Variable       | Description          |
-| -------------- | -------------------- |
-| `VITE_API_URL` | Backend API base URL |
+Emails are sent via BullMQ queue (non-blocking, retries on failure).
 
 ---
 
-## Deployment
+## Deployment on Render
 
-| Service  | Platform      |
-| -------- | ------------- |
-| Backend  | Railway       |
-| Frontend | Vercel        |
-| Database | MongoDB Atlas |
-| Images   | Cloudinary    |
+### Backend (Web Service)
 
-Connect your GitHub repo to Railway (backend) and Vercel (frontend) for auto-deploy on push. Set all environment variables in each platform's dashboard.
+| Setting       | Value                  |
+| ------------- | ---------------------- |
+| Root Dir      | `server`               |
+| Build Command | `npm install && npm run build` |
+| Start Command | `npm start`            |
+| Node Version  | 20                     |
+
+Add all `server/.env` variables in Render's **Environment** tab.
+
+### Frontend (Static Site)
+
+| Setting       | Value           |
+| ------------- | --------------- |
+| Root Dir      | `client`        |
+| Build Command | `npm install && npm run build` |
+| Publish Dir   | `dist`          |
+
+Add `VITE_API_URL` and `VITE_CLERK_PUBLISHABLE_KEY` in Render's environment.
+
+---
+
+## VPS Deployment (with Nginx)
+
+See `nginx.conf` at the project root. It handles:
+- HTTP → HTTPS redirect
+- SSL termination (use Certbot)
+- Static file serving for the React build
+- API proxying to Node.js
+- WebSocket (Socket.io) proxying
+- Load balancing across multiple Node instances
+
+```bash
+# Install Nginx
+sudo apt install nginx
+
+# Copy config
+sudo cp nginx.conf /etc/nginx/sites-available/markethub
+sudo ln -s /etc/nginx/sites-available/markethub /etc/nginx/sites-enabled/
+
+# Get SSL cert
+sudo certbot --nginx -d yourdomain.com
+
+# Reload
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+---
+
+## Environment Variables Reference
+
+### Server
+
+| Variable                  | Description                              |
+| ------------------------- | ---------------------------------------- |
+| `PORT`                    | Server port (default: 5000)              |
+| `NODE_ENV`                | `development` or `production`            |
+| `MONGO_URI`               | MongoDB Atlas connection string          |
+| `CLIENT_URL`              | Frontend URL for CORS                    |
+| `CLERK_PUBLISHABLE_KEY`   | Clerk publishable key                    |
+| `CLERK_SECRET_KEY`        | Clerk secret key                         |
+| `CLOUDINARY_CLOUD_NAME`   | Cloudinary cloud name                    |
+| `CLOUDINARY_API_KEY`      | Cloudinary API key                       |
+| `CLOUDINARY_API_SECRET`   | Cloudinary API secret                    |
+| `GMAIL_USER`              | Gmail address for sending emails         |
+| `GMAIL_APP_PASSWORD`      | Gmail App Password (16 chars)            |
+| `GMAIL_FROM_NAME`         | Sender display name                      |
+| `UPSTASH_REDIS_REST_URL`  | Upstash Redis REST URL                   |
+| `UPSTASH_REDIS_REST_TOKEN`| Upstash Redis REST token                 |
+| `ADMIN_EMAIL`             | Admin email for seed script              |
+| `ADMIN_PASSWORD`          | Admin password for seed script           |
+| `ADMIN_NAME`              | Admin display name for seed script       |
+| `SENTRY_DSN`              | Sentry DSN (optional)                    |
+
+### Client
+
+| Variable                      | Description                    |
+| ----------------------------- | ------------------------------ |
+| `VITE_API_URL`                | Backend API base URL           |
+| `VITE_CLERK_PUBLISHABLE_KEY`  | Clerk publishable key          |

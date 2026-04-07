@@ -1,11 +1,14 @@
 {
   "name": "server",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "dist/server.js",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "dev": "npx ts-node server.ts",
-    "start": "node dist/server.js",
     "build": "tsc",
+    "start": "node dist/server.js",
     "seed": "npx ts-node seed.ts",
     "seed:fresh": "npx ts-node seed.ts --fresh",
     "seed:admin": "npx ts-node scripts/seedAdmin.ts",
@@ -18,7 +21,6 @@
   "dependencies": {
     "@clerk/express": "^2.0.11",
     "@sentry/node": "^10.47.0",
-    "@types/ioredis": "^5.0.0",
     "@upstash/redis": "^1.37.0",
     "bcryptjs": "^3.0.3",
     "bullmq": "^5.73.0",
@@ -32,7 +34,6 @@
     "express-validator": "^7.3.2",
     "helmet": "^8.1.0",
     "hpp": "^0.2.3",
-    "ioredis": "^5.10.1",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.3.3",
     "morgan": "^1.10.1",
@@ -41,6 +42,8 @@
     "nodemailer": "^8.0.4",
     "slugify": "^1.6.9",
     "socket.io": "^4.8.3",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.2",
     "winston": "^3.19.0"
   },
   "devDependencies": {
@@ -53,8 +56,6 @@
     "@types/morgan": "^1.9.10",
     "@types/multer": "^2.1.0",
     "@types/node": "^25.5.2",
-    "@types/nodemailer": "^8.0.0",
-    "ts-node": "^10.9.2",
-    "typescript": "^6.0.2"
+    "@types/nodemailer": "^8.0.0"
   }
 }
