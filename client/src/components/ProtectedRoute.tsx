@@ -1,9 +1,9 @@
 import { Navigate, Outlet } from "react-router-dom";
+import { useUser } from "@clerk/react";
 import { useAuth } from "../context/AuthContext";
 
 const ROLE_HOME: Record<string, string> = { buyer: "/", admin: "/admin/dashboard" };
 
-// Skeleton loader shown while Clerk + DB sync is in progress
 function AuthSkeleton() {
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -22,19 +22,39 @@ function AuthSkeleton() {
   );
 }
 
+// Protects routes that require login + optional role check
 export default function ProtectedRoute({ allowedRoles }: { allowedRoles?: string[] }) {
+  const { isLoaded, isSignedIn } = useUser();
   const { user, loading } = useAuth();
-  if (loading) return <AuthSkeleton />;
-  if (!user) return <Navigate to="/sign-in" replace />;
+
+  // Wait for Clerk to load
+  if (!isLoaded || loading) return <AuthSkeleton />;
+
+  // Not signed in at all → send to Clerk sign-in
+  if (!isSignedIn) return <Navigate to="/sign-in" replace />;
+
+  // Signed in but DB sync still in progress → wait
+  if (!user) return <AuthSkeleton />;
+
+  // Wrong role → redirect to their home
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     return <Navigate to={ROLE_HOME[user.role] ?? "/"} replace />;
   }
+
   return <Outlet />;
 }
 
+// Blocks /sign-in and /sign-up when already signed in
 export function GuestRoute() {
+  const { isLoaded, isSignedIn } = useUser();
   const { user, loading } = useAuth();
-  if (loading) return <AuthSkeleton />;
-  if (user) return <Navigate to={ROLE_HOME[user.role] ?? "/"} replace />;
+
+  if (!isLoaded) return <AuthSkeleton />;
+
+  // Already signed in and DB user resolved → redirect to their home
+  if (isSignedIn && !loading && user) {
+    return <Navigate to={ROLE_HOME[user.role] ?? "/"} replace />;
+  }
+
   return <Outlet />;
 }

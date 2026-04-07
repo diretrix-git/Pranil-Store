@@ -6,7 +6,6 @@ import { IUser } from "../types";
 interface AuthContextValue {
   user: IUser | null;
   loading: boolean;
-  clerkLoaded: boolean;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
@@ -21,21 +20,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!isLoaded) return;
 
     if (!isSignedIn) {
+      // Clear auth header and user state on sign-out
+      delete api.defaults.headers.common["Authorization"];
       setDbUser(null);
       return;
     }
 
-    // Sync Clerk user into MongoDB and get role
     const sync = async () => {
       setSyncing(true);
       try {
+        // Get Clerk session token and attach to all future axios requests
         const token = await getToken();
-        const res = await api.get("/auth/me", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        if (token) {
+          api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+        }
+
+        const res = await api.get("/auth/me");
         const u = res.data.data?.user ?? null;
         setDbUser(u);
-      } catch {
+      } catch (err) {
+        console.error("Auth sync failed:", err);
         setDbUser(null);
       } finally {
         setSyncing(false);
@@ -46,13 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [isLoaded, isSignedIn, clerkUser?.id]);
 
   return (
-    <AuthContext.Provider
-      value={{
-        user: dbUser,
-        loading: !isLoaded || syncing,
-        clerkLoaded: isLoaded,
-      }}
-    >
+    <AuthContext.Provider value={{ user: dbUser, loading: !isLoaded || syncing }}>
       {children}
     </AuthContext.Provider>
   );
