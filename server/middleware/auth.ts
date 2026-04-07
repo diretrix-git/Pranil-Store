@@ -1,45 +1,51 @@
 import { Request, Response, NextFunction } from "express";
-import { createClerkClient, requireAuth as clerkRequireAuth } from "@clerk/express";
+import { createClerkClient, verifyToken } from "@clerk/express";
 import User from "../models/User";
 import AppError from "../utils/AppError";
 
 const clerkClient = createClerkClient({
-  publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
   secretKey: process.env.CLERK_SECRET_KEY,
 });
 
-// Clerk's built-in middleware — rejects requests with no valid session
-export const requireAuth = clerkRequireAuth({
-  publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
-  secretKey: process.env.CLERK_SECRET_KEY,
-});
-
-// Attaches req.user (MongoDB doc) after verifying Clerk session
+// Verifies Clerk Bearer token and attaches req.user (MongoDB doc)
 export const protect = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const clerkUserId = (req as any).auth?.userId;
-    if (!clerkUserId) return next(new AppError("Not authenticated. Please log in.", 401));
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer ")) {
+      return next(new AppError("Not authenticated. Please log in.", 401));
+    }
 
-    // Look up MongoDB user by clerkId
+    const token = authHeader.split(" ")[1];
+
+    // Verify the Clerk session token
+    let payload: any;
+    try {
+      payload = await verifyToken(token, {
+        secretKey: process.env.CLERK_SECRET_KEY,
+      });
+    } catch {
+      return next(new AppError("Invalid or expired session. Please log in again.", 401));
+    }
+
+    const clerkUserId = payload.sub;
+    if (!clerkUserId) return next(new AppError("Invalid token payload.", 401));
+
+    // Find existing MongoDB user by clerkId
     let user = await User.findOne({ clerkId: clerkUserId, isDeleted: false });
 
     if (!user) {
-      // First time — sync from Clerk
+      // First login — fetch from Clerk and upsert into MongoDB
       const clerkUser = await clerkClient.users.getUser(clerkUserId);
       const email = clerkUser.emailAddresses[0]?.emailAddress ?? "";
       const role = (clerkUser.publicMetadata?.role as string) === "admin" ? "admin" : "buyer";
+      const name = `${clerkUser.firstName ?? ""} ${clerkUser.lastName ?? ""}`.trim() || email;
+      const phone = clerkUser.phoneNumbers[0]?.phoneNumber ?? "";
 
       user = await User.findOneAndUpdate(
         { email },
         {
-          $setOnInsert: {
-            name: `${clerkUser.firstName ?? ""} ${clerkUser.lastName ?? ""}`.trim() || email,
-            email,
-            phone: clerkUser.phoneNumbers[0]?.phoneNumber ?? "",
-            password: "clerk-managed",
-            role,
-            clerkId: clerkUserId,
-          },
+          $set: { clerkId: clerkUserId, role },
+          $setOnInsert: { name, email, phone, password: "clerk-managed" },
         },
         { upsert: true, new: true },
       );
@@ -54,3 +60,6 @@ export const protect = async (req: Request, res: Response, next: NextFunction): 
     next(err);
   }
 };
+
+// Alias — some routes use requireAuth + protect, now they're the same
+export const requireAuth = protect;

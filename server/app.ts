@@ -5,7 +5,6 @@ import cookieParser from "cookie-parser";
 import mongoSanitize from "express-mongo-sanitize";
 import hpp from "hpp";
 import morgan from "morgan";
-import { clerkMiddleware } from "@clerk/express";
 import errorHandler from "./middleware/errorHandler";
 
 const app = express();
@@ -25,12 +24,6 @@ app.use(mongoSanitize());
 app.use(hpp());
 
 if (process.env.NODE_ENV === "development") app.use(morgan("dev"));
-
-// Clerk session parsing — must come before routes
-app.use(clerkMiddleware({
-  publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
-  secretKey: process.env.CLERK_SECRET_KEY,
-}));
 
 import authRoutes from "./routes/auth";
 import categoryRoutes from "./routes/categories";
