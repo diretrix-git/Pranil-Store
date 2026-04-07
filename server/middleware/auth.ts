@@ -1,10 +1,18 @@
 import { Request, Response, NextFunction } from "express";
-import { clerkClient, requireAuth as clerkRequireAuth } from "@clerk/express";
+import { createClerkClient, requireAuth as clerkRequireAuth } from "@clerk/express";
 import User from "../models/User";
 import AppError from "../utils/AppError";
 
+const clerkClient = createClerkClient({
+  publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
+  secretKey: process.env.CLERK_SECRET_KEY,
+});
+
 // Clerk's built-in middleware — rejects requests with no valid session
-export const requireAuth = clerkRequireAuth();
+export const requireAuth = clerkRequireAuth({
+  publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
+  secretKey: process.env.CLERK_SECRET_KEY,
+});
 
 // Attaches req.user (MongoDB doc) after verifying Clerk session
 export const protect = async (req: Request, res: Response, next: NextFunction): Promise<void> => {

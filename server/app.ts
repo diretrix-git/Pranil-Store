@@ -27,7 +27,10 @@ app.use(hpp());
 if (process.env.NODE_ENV === "development") app.use(morgan("dev"));
 
 // Clerk session parsing — must come before routes
-app.use(clerkMiddleware());
+app.use(clerkMiddleware({
+  publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
+  secretKey: process.env.CLERK_SECRET_KEY,
+}));
 
 import authRoutes from "./routes/auth";
 import categoryRoutes from "./routes/categories";
