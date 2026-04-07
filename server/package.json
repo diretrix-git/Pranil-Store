@@ -6,8 +6,10 @@
     "dev": "npx ts-node server.ts",
     "start": "node dist/server.js",
     "build": "tsc",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "seed:admin": "npx ts-node scripts/seedAdmin.ts"
+    "seed": "npx ts-node seed.ts",
+    "seed:fresh": "npx ts-node seed.ts --fresh",
+    "seed:admin": "npx ts-node scripts/seedAdmin.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
