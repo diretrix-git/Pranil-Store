@@ -9,6 +9,7 @@ import app from "./app";
 import connectDB from "./config/db";
 import logger from "./utils/logger";
 import User from "./models/User";
+import { startEmailWorker } from "./queues/emailQueue";
 
 const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
@@ -63,6 +64,7 @@ io.on("connection", (socket) => {
 
 const startServer = async (): Promise<void> => {
   await connectDB();
+  startEmailWorker();
   httpServer.listen(PORT, () => {
     logger.info(`Server running on port ${PORT} in ${process.env.NODE_ENV || "development"} mode`);
   });

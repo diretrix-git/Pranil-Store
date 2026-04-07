@@ -4,7 +4,7 @@ import Order from "../models/Order";
 import Product from "../models/Product";
 import AppError from "../utils/AppError";
 import logger from "../utils/logger";
-import { sendBuyerConfirmation, sendAdminNotification, sendOrderStatusUpdate } from "../utils/mailer";
+import { emailQueue } from "../queues/emailQueue";
 
 // Statuses that trigger a buyer notification email (not "processing")
 const NOTIFIABLE_STATUSES = new Set(["pending", "confirmed", "completed", "cancelled"]);
@@ -63,8 +63,9 @@ export const placeOrder = async (req: Request, res: Response, next: NextFunction
       });
     }
 
-    Promise.all([sendBuyerConfirmation(order), sendAdminNotification(order)]).catch((err) =>
-      logger.error(`Email send failed: ${err.message}`),
+    // Queue emails via BullMQ — non-blocking, retries on failure
+    emailQueue.add("order_placed", { type: "order_placed", order }).catch((err) =>
+      logger.error(`Failed to queue order_placed email: ${err.message}`)
     );
 
     res.status(201).json({ status: "success", data: { order }, message: "Order placed successfully" });
@@ -97,10 +98,10 @@ export const updateOrderStatus = async (req: Request, res: Response, next: NextF
       logger.info(`Stock restored for cancelled order ${order.orderNumber}`);
     }
 
-    // Send buyer status email for notifiable statuses (skip "processing")
+    // Send buyer status email via queue for notifiable statuses (skip "processing")
     if (NOTIFIABLE_STATUSES.has(newStatus) && newStatus !== previousStatus) {
-      sendOrderStatusUpdate(order, newStatus as any).catch((err) =>
-        logger.error(`Status email failed for ${order.orderNumber}: ${err.message}`)
+      emailQueue.add("order_status", { type: "order_status", order, newStatus }).catch((err) =>
+        logger.error(`Failed to queue order_status email: ${err.message}`)
       );
     }
 

@@ -6,6 +6,7 @@ import mongoSanitize from "express-mongo-sanitize";
 import hpp from "hpp";
 import morgan from "morgan";
 import errorHandler from "./middleware/errorHandler";
+import { generalLimiter } from "./middleware/rateLimiter";
 
 const app = express();
 
@@ -24,6 +25,9 @@ app.use(mongoSanitize());
 app.use(hpp());
 
 if (process.env.NODE_ENV === "development") app.use(morgan("dev"));
+
+// Global rate limit — 200 req/min per IP
+app.use(generalLimiter);
 
 import authRoutes from "./routes/auth";
 import categoryRoutes from "./routes/categories";
