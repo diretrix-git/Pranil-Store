@@ -8,7 +8,7 @@ const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <ClerkProvider publishableKey={publishableKey} afterSignOutUrl="/">
+    <ClerkProvider publishableKey={publishableKey} afterSignOutUrl="/" afterSignInUrl="/">
       <App />
     </ClerkProvider>
   </StrictMode>,

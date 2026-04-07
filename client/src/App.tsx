@@ -1,10 +1,11 @@
 import { lazy, Suspense } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SignIn, SignUp } from "@clerk/react";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute, { GuestRoute } from "./components/ProtectedRoute";
 import AdminLayout from "./layouts/AdminLayout";
+import { useAuth } from "./context/AuthContext";
 
 // Public
 const HomePage     = lazy(() => import("./pages/buyer/HomePage"));
@@ -58,6 +59,14 @@ const ClerkPage = ({ children }: { children: React.ReactNode }) => (
   </div>
 );
 
+// After sign-in, redirect admins to dashboard; buyers stay on home
+function RoleRedirect({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  if (loading) return <PageSkeleton />;
+  if (user?.role === "admin") return <Navigate to="/admin/dashboard" replace />;
+  return <>{children}</>;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -66,7 +75,7 @@ export default function App() {
           <Suspense fallback={<PageSkeleton />}>
             <Routes>
               {/* Public */}
-              <Route path="/"             element={<HomePage />} />
+              <Route path="/"             element={<RoleRedirect><HomePage /></RoleRedirect>} />
               <Route path="/about"        element={<AboutPage />} />
               <Route path="/contact"      element={<ContactPage />} />
               <Route path="/products/:id" element={<ProductPage />} />
