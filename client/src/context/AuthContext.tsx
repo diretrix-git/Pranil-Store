@@ -19,27 +19,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const syncUser = useCallback(async () => {
     setSyncing(true);
     try {
-      // Retry getting token up to 5 times — Clerk session can take a moment
+      // Wait for a valid token — Clerk session can take a moment after isLoaded
       let token: string | null = null;
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 8; i++) {
         token = await getToken();
         if (token) break;
-        await new Promise((r) => setTimeout(r, 300));
+        await new Promise((r) => setTimeout(r, 400));
       }
 
       if (!token) {
-        console.warn("Clerk token unavailable after retries");
         setDbUser(null);
         return;
       }
 
-      api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-
-      const res = await api.get("/auth/me");
-      const u = res.data.data?.user ?? null;
-      setDbUser(u);
+      // Explicitly set header for this call (interceptor may not have token yet)
+      const res = await api.get("/auth/me", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setDbUser(res.data.data?.user ?? null);
     } catch (err: any) {
-      console.error("Auth sync failed:", err?.response?.data ?? err.message);
+      console.error("Auth sync failed:", err?.response?.status, err?.response?.data?.message ?? err.message);
       setDbUser(null);
     } finally {
       setSyncing(false);
@@ -48,13 +47,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isLoaded) return;
-
     if (!isSignedIn) {
-      delete api.defaults.headers.common["Authorization"];
       setDbUser(null);
       return;
     }
-
     syncUser();
   }, [isLoaded, isSignedIn, clerkUser?.id, syncUser]);
 
