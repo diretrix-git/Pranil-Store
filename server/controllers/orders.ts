@@ -4,7 +4,10 @@ import Order from "../models/Order";
 import Product from "../models/Product";
 import AppError from "../utils/AppError";
 import logger from "../utils/logger";
-import { sendBuyerConfirmation, sendAdminNotification } from "../utils/mailer";
+import { sendBuyerConfirmation, sendAdminNotification, sendOrderStatusUpdate } from "../utils/mailer";
+
+// Statuses that trigger a buyer notification email (not "processing")
+const NOTIFIABLE_STATUSES = new Set(["pending", "confirmed", "completed", "cancelled"]);
 
 export const placeOrder = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -79,8 +82,28 @@ export const updateOrderStatus = async (req: Request, res: Response, next: NextF
   try {
     const order = await Order.findOne({ _id: req.params.orderId, isDeleted: false });
     if (!order) return next(new AppError("Order not found.", 404));
-    order.status = req.body.status;
+
+    const previousStatus = order.status;
+    const newStatus = req.body.status as string;
+
+    order.status = newStatus as any;
     await order.save();
+
+    // Restore stock when order is cancelled (only if it wasn't already cancelled)
+    if (newStatus === "cancelled" && previousStatus !== "cancelled") {
+      for (const item of order.items) {
+        await Product.findByIdAndUpdate(item.product, { $inc: { stock: item.quantity } });
+      }
+      logger.info(`Stock restored for cancelled order ${order.orderNumber}`);
+    }
+
+    // Send buyer status email for notifiable statuses (skip "processing")
+    if (NOTIFIABLE_STATUSES.has(newStatus) && newStatus !== previousStatus) {
+      sendOrderStatusUpdate(order, newStatus as any).catch((err) =>
+        logger.error(`Status email failed for ${order.orderNumber}: ${err.message}`)
+      );
+    }
+
     res.status(200).json({ status: "success", data: { order }, message: "Order status updated" });
   } catch (err) { next(err); }
 };
