@@ -89,11 +89,18 @@ io.on("connection", (socket) => {
     });
 });
 const startServer = async () => {
-    await (0, db_1.default)();
-    (0, emailQueue_1.startEmailWorker)();
-    httpServer.listen(PORT, "0.0.0.0", () => {
-        logger_1.default.info(`Server running on port ${PORT} in ${process.env.NODE_ENV || "development"} mode`);
-    });
+    try {
+        await (0, db_1.default)();
+        (0, emailQueue_1.startEmailWorker)();
+        httpServer.listen(PORT, "0.0.0.0", () => {
+            logger_1.default.info(`Server running on port ${PORT} in ${process.env.NODE_ENV || "development"} mode`);
+        });
+    }
+    catch (err) {
+        console.error("FATAL: Server failed to start:", err.message);
+        console.error(err.stack);
+        process.exit(1);
+    }
 };
 startServer();
 process.on("unhandledRejection", (err) => {

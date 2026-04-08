@@ -61,11 +61,17 @@ io.on("connection", (socket) => {
 });
 
 const startServer = async (): Promise<void> => {
-  await connectDB();
-  startEmailWorker();
-  httpServer.listen(PORT, "0.0.0.0", () => {
-    logger.info(`Server running on port ${PORT} in ${process.env.NODE_ENV || "development"} mode`);
-  });
+  try {
+    await connectDB();
+    startEmailWorker();
+    httpServer.listen(PORT, "0.0.0.0", () => {
+      logger.info(`Server running on port ${PORT} in ${process.env.NODE_ENV || "development"} mode`);
+    });
+  } catch (err: any) {
+    console.error("FATAL: Server failed to start:", err.message);
+    console.error(err.stack);
+    process.exit(1);
+  }
 };
 
 startServer();
