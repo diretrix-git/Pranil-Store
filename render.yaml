@@ -1,18 +1,16 @@
 services:
-  # Backend API
   - type: web
     name: markethub-api
     runtime: node
     region: oregon
     plan: free
     rootDir: server
-    buildCommand: npm install
-    startCommand: npm start
+    buildCommand: npm install && npm run build
+    startCommand: node dist/server.js
     envVars:
       - key: NODE_ENV
         value: production
 
-  # Frontend (Static Site)
   - type: web
     name: markethub-client
     runtime: static
@@ -21,6 +19,3 @@ services:
     rootDir: client
     buildCommand: npm install && npm run build
     staticPublishPath: dist
-    envVars:
-      - key: NODE_ENV
-        value: production
