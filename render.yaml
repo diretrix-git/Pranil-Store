@@ -6,14 +6,11 @@ services:
     region: oregon
     plan: free
     rootDir: server
-    buildCommand: npm install && npm run build
+    buildCommand: npm install
     startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 5000
-      # Add all other env vars in Render Dashboard
 
   # Frontend (Static Site)
   - type: web
@@ -27,4 +24,3 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      # Add VITE_API_URL and VITE_CLERK_PUBLISHABLE_KEY in Render Dashboard
