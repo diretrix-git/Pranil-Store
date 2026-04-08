@@ -47,6 +47,14 @@ const db_1 = __importDefault(require("./config/db"));
 const logger_1 = __importDefault(require("./utils/logger"));
 const User_1 = __importDefault(require("./models/User"));
 const emailQueue_1 = require("./queues/emailQueue");
+// ── Validate required env vars before anything else ───────────────────────────
+const REQUIRED_ENV = ["MONGO_URI", "CLERK_SECRET_KEY", "CLERK_PUBLISHABLE_KEY"];
+const missing = REQUIRED_ENV.filter((k) => !process.env[k]);
+if (missing.length > 0) {
+    console.error(`FATAL: Missing required environment variables: ${missing.join(", ")}`);
+    console.error("Set these in your Render dashboard under Environment.");
+    process.exit(1);
+}
 const PORT = Number(process.env.PORT) || 5000;
 const httpServer = http_1.default.createServer(app_1.default);
 const allowedOrigins = (process.env.CLIENT_URL || "")
