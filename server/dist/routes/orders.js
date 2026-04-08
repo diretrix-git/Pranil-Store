@@ -1,0 +1,16 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const orders_1 = require("../controllers/orders");
+const orders_2 = require("../validators/orders");
+const validate_1 = require("../middleware/validate");
+const auth_1 = require("../middleware/auth");
+const restrictTo_1 = require("../middleware/restrictTo");
+const rateLimiter_1 = require("../middleware/rateLimiter");
+const router = (0, express_1.Router)();
+router.post("/", auth_1.requireAuth, auth_1.protect, (0, restrictTo_1.restrictTo)("buyer"), rateLimiter_1.orderLimiter, orders_1.placeOrder);
+router.get("/my", auth_1.requireAuth, auth_1.protect, (0, restrictTo_1.restrictTo)("buyer"), orders_1.getBuyerOrders);
+router.get("/:orderId/invoice", auth_1.requireAuth, auth_1.protect, orders_1.getInvoice);
+router.get("/", auth_1.requireAuth, auth_1.protect, (0, restrictTo_1.restrictTo)("admin"), orders_1.getAllOrders);
+router.patch("/:orderId/status", auth_1.requireAuth, auth_1.protect, (0, restrictTo_1.restrictTo)("admin"), orders_2.statusValidation, validate_1.validate, orders_1.updateOrderStatus);
+exports.default = router;

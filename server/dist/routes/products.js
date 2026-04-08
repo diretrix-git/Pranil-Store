@@ -1,0 +1,17 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const products_1 = require("../controllers/products");
+const products_2 = require("../validators/products");
+const cloudinaryHelper_1 = require("../utils/cloudinaryHelper");
+const validate_1 = require("../middleware/validate");
+const auth_1 = require("../middleware/auth");
+const restrictTo_1 = require("../middleware/restrictTo");
+const rateLimiter_1 = require("../middleware/rateLimiter");
+const router = (0, express_1.Router)();
+router.get("/", products_1.getProducts);
+router.get("/:id", products_1.getProduct);
+router.post("/", auth_1.requireAuth, auth_1.protect, (0, restrictTo_1.restrictTo)("admin"), rateLimiter_1.uploadLimiter, cloudinaryHelper_1.uploadProductImages, products_2.productValidation, validate_1.validate, products_1.createProduct);
+router.put("/:id", auth_1.requireAuth, auth_1.protect, (0, restrictTo_1.restrictTo)("admin"), rateLimiter_1.uploadLimiter, cloudinaryHelper_1.uploadProductImages, validate_1.validate, products_1.updateProduct);
+router.delete("/:id", auth_1.requireAuth, auth_1.protect, (0, restrictTo_1.restrictTo)("admin"), products_1.deleteProduct);
+exports.default = router;
