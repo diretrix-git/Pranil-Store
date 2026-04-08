@@ -4,16 +4,14 @@ Sentry.init({ dsn: process.env.SENTRY_DSN });
 
 import http from "http";
 import { Server } from "socket.io";
-import { createClerkClient, verifyToken } from "@clerk/express";
+import { verifyToken } from "@clerk/express";
 import app from "./app";
 import connectDB from "./config/db";
 import logger from "./utils/logger";
 import User from "./models/User";
 import { startEmailWorker } from "./queues/emailQueue";
 
-const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
-
-const PORT = process.env.PORT || 5000;
+const PORT = Number(process.env.PORT) || 5000;
 
 const httpServer = http.createServer(app);
 
@@ -65,7 +63,7 @@ io.on("connection", (socket) => {
 const startServer = async (): Promise<void> => {
   await connectDB();
   startEmailWorker();
-  httpServer.listen(PORT, () => {
+  httpServer.listen(PORT, "0.0.0.0", () => {
     logger.info(`Server running on port ${PORT} in ${process.env.NODE_ENV || "development"} mode`);
   });
 };
