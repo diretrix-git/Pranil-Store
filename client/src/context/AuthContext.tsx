@@ -6,6 +6,7 @@ import { IUser } from "../types";
 interface AuthContextValue {
   user: IUser | null;
   loading: boolean;
+  syncFailed: boolean;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
@@ -15,9 +16,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { getToken } = useClerkAuth();
   const [dbUser, setDbUser] = useState<IUser | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [syncFailed, setSyncFailed] = useState(false);
 
   const syncUser = useCallback(async () => {
     setSyncing(true);
+    setSyncFailed(false);
     try {
       // Wait for a valid token — Clerk session can take a moment after isLoaded
       let token: string | null = null;
@@ -29,6 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!token) {
         setDbUser(null);
+        setSyncFailed(true);
         return;
       }
 
@@ -37,9 +41,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         headers: { Authorization: `Bearer ${token}` },
       });
       setDbUser(res.data.data?.user ?? null);
+      setSyncFailed(false);
     } catch (err: any) {
       console.error("Auth sync failed:", err?.response?.status, err?.response?.data?.message ?? err.message);
       setDbUser(null);
+      setSyncFailed(true);
     } finally {
       setSyncing(false);
     }
@@ -49,13 +55,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!isLoaded) return;
     if (!isSignedIn) {
       setDbUser(null);
+      setSyncFailed(false);
       return;
     }
     syncUser();
   }, [isLoaded, isSignedIn, clerkUser?.id, syncUser]);
 
   return (
-    <AuthContext.Provider value={{ user: dbUser, loading: !isLoaded || syncing }}>
+    <AuthContext.Provider value={{ user: dbUser, loading: !isLoaded || syncing, syncFailed }}>
       {children}
     </AuthContext.Provider>
   );

@@ -71,27 +71,24 @@ export default function CartPage() {
   }, [updateQty]);
 
   const flushAndCheckout = useCallback(async () => {
-    // Cancel all pending debounces and flush any dirty quantities to the server
-    const pending = Object.entries(debounceRef.current);
-    if (pending.length > 0) {
-      pending.forEach(([pid, timer]) => {
-        clearTimeout(timer);
-        delete debounceRef.current[pid];
-      });
-      // Fire all dirty qty updates in parallel and wait for them
-      const dirtyPids = Object.keys(localQty);
-      if (dirtyPids.length > 0) {
-        await Promise.all(
-          dirtyPids.map((pid) => {
-            const qty = Number(localQty[pid]);
-            if (qty >= 1) return api.patch(`/cart/item/${pid}`, { quantity: qty });
-            return Promise.resolve();
-          })
-        );
-        await queryClient.invalidateQueries({ queryKey: ["cart"] });
-      }
-    }
+    // Show modal immediately — don't wait for server round trips
     setShowCheckout(true);
+
+    // Fire qty updates in background (non-blocking)
+    const pending = Object.entries(debounceRef.current);
+    pending.forEach(([, timer]) => clearTimeout(timer));
+    debounceRef.current = {};
+
+    const dirtyPids = Object.keys(localQty);
+    if (dirtyPids.length > 0) {
+      Promise.all(
+        dirtyPids.map((pid) => {
+          const qty = Number(localQty[pid]);
+          if (qty >= 1) return api.patch(`/cart/item/${pid}`, { quantity: qty }).catch(() => null);
+          return Promise.resolve();
+        })
+      ).then(() => queryClient.invalidateQueries({ queryKey: ["cart"] }));
+    }
   }, [localQty, queryClient]);
   const items: any[] = (cartData as any)?.items ?? [];
   // Compute total from localQty so it stays in sync with what the user typed

@@ -49,7 +49,7 @@ export const protect = async (req: Request, res: Response, next: NextFunction): 
           $set: { clerkId: clerkUserId, role: clerkRole },
           $setOnInsert: { name, email, phone, password: "clerk-managed" },
         },
-        { upsert: true, new: true },
+        { upsert: true, new: true, runValidators: false },
       );
     } else if (user.role !== clerkRole) {
       // Role changed in Clerk — sync it to MongoDB immediately

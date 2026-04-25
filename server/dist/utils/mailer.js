@@ -7,18 +7,23 @@ exports.sendPasswordResetEmail = exports.sendAdminNotification = exports.sendOrd
 const nodemailer_1 = __importDefault(require("nodemailer"));
 const logger_1 = __importDefault(require("./logger"));
 const transporter = nodemailer_1.default.createTransport({
-    service: "gmail",
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false, // STARTTLS
     auth: {
         user: process.env.GMAIL_USER,
         // Strip spaces — Google shows the app password with spaces but Nodemailer needs it without
         pass: (process.env.GMAIL_APP_PASSWORD ?? "").replace(/\s+/g, ""),
+    },
+    tls: {
+        rejectUnauthorized: false,
     },
 });
 // Verify SMTP connection on startup — logs a warning if credentials are wrong
 transporter.verify().then(() => {
     logger_1.default.info("✅ SMTP transporter ready");
 }).catch((err) => {
-    logger_1.default.warn(`⚠️  SMTP transporter failed to connect: ${err.message} — emails will not be sent`);
+    logger_1.default.warn(`⚠️  SMTP transporter failed: ${err.message} (code: ${err.code}) — check GMAIL_USER and GMAIL_APP_PASSWORD in Render env`);
 });
 const FROM = `"${process.env.GMAIL_FROM_NAME || "MarketHub"}" <${process.env.GMAIL_USER}>`;
 // ── Shared helpers ────────────────────────────────────────────────────────────

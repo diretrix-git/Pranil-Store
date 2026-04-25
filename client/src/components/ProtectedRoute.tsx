@@ -21,9 +21,27 @@ function AuthSkeleton() {
   );
 }
 
+function SyncErrorScreen() {
+  return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
+      <div className="text-center max-w-sm">
+        <p className="text-4xl mb-4">⚠️</p>
+        <h2 className="text-lg font-bold text-slate-800 mb-2">Connection issue</h2>
+        <p className="text-slate-500 text-sm mb-6">Could not reach the server. Please check your connection and try again.</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:opacity-90 transition-opacity"
+        >
+          Retry
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function ProtectedRoute({ allowedRoles }: { allowedRoles?: string[] }) {
   const { isLoaded, isSignedIn } = useUser();
-  const { user, loading } = useAuth();
+  const { user, loading, syncFailed } = useAuth();
 
   // Clerk not ready yet
   if (!isLoaded) return <AuthSkeleton />;
@@ -31,12 +49,11 @@ export default function ProtectedRoute({ allowedRoles }: { allowedRoles?: string
   // Not signed in → go to sign-in
   if (!isSignedIn) return <Navigate to="/sign-in" replace />;
 
-  // Signed in but DB sync in progress
-  if (loading) return <AuthSkeleton />;
+  // Sync failed (server down / cold start) — show retry screen instead of blank/redirect
+  if (syncFailed && !user) return <SyncErrorScreen />;
 
-  // Sync failed or user not found — still signed in but no DB record
-  // Redirect to home and let it retry
-  if (!user) return <Navigate to="/" replace />;
+  // Signed in but DB sync in progress — show skeleton
+  if (loading || !user) return <AuthSkeleton />;
 
   // Wrong role → redirect to their correct home
   if (allowedRoles && !allowedRoles.includes(user.role)) {
