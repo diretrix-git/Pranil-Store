@@ -31,10 +31,10 @@ const CATEGORIES = [
 ];
 
 const ADMIN = {
-  name: "Admin",
-  email: "taroluffy71@gmail.com",
+  name: process.env.ADMIN_NAME || "Admin",
+  email: process.env.ADMIN_EMAIL || "admin@markethub.com",
   phone: "+1234567890",
-  password: "PSWNAITHAXAINA@6430",
+  password: process.env.ADMIN_PASSWORD || "Admin@1234",
   role: "admin" as const,
 };
 

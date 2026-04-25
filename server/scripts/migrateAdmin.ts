@@ -1,6 +1,7 @@
 /**
  * One-time admin migration script.
  * Deletes ALL existing admin accounts and creates a fresh one.
+ * Reads credentials from .env (ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NAME)
  *
  * Run: npx ts-node scripts/migrateAdmin.ts
  */
@@ -10,28 +11,26 @@ import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import User from "../models/User";
 
-const NEW_ADMIN = {
-  name: "Krish",
-  email: "taroluffy71@gmail.com",
-  phone: "+0000000000",
-  password: "PSWNAITHAXAINA@6430",
-  role: "admin" as const,
-};
-
 async function run() {
+  const email = process.env.ADMIN_EMAIL;
+  const password = process.env.ADMIN_PASSWORD;
+  const name = process.env.ADMIN_NAME || "Admin";
+
+  if (!email || !password) {
+    console.error("❌ ADMIN_EMAIL and ADMIN_PASSWORD must be set in .env");
+    process.exit(1);
+  }
+
   await mongoose.connect(process.env.MONGO_URI as string);
   console.log("✅ Connected to MongoDB\n");
 
-  // Remove all existing admin accounts
   const deleted = await User.deleteMany({ role: "admin" });
   console.log(`🗑️  Removed ${deleted.deletedCount} existing admin account(s)`);
 
-  // Create new admin
-  const hashed = await bcrypt.hash(NEW_ADMIN.password, 12);
-  await User.create({ ...NEW_ADMIN, password: hashed });
+  const hashed = await bcrypt.hash(password, 12);
+  await User.create({ name, email, phone: "+0000000000", password: hashed, role: "admin" });
 
-  console.log(`✅ New admin created: ${NEW_ADMIN.email}`);
-  console.log(`   Password: ${NEW_ADMIN.password}\n`);
+  console.log(`✅ New admin created: ${email}\n`);
 
   await mongoose.disconnect();
   process.exit(0);
