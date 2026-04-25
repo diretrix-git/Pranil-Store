@@ -21,10 +21,14 @@ const NOTIFIABLE = new Set(["pending", "confirmed", "completed", "cancelled"]);
 
 export function queueEmail(data: EmailJobData): void {
   if (data.type === "order_placed") {
-    Promise.all([
-      sendBuyerConfirmation(data.order),
-      sendAdminNotification(data.order),
-    ]).catch((err) => logger.error(`Email failed [order_placed ${(data.order as any).orderNumber}]: ${err.message}`));
+    // Guard: skip buyer email if no email address captured in snapshot
+    const tasks: Promise<void>[] = [sendAdminNotification(data.order)];
+    if (data.order.buyerSnapshot?.email) {
+      tasks.push(sendBuyerConfirmation(data.order));
+    } else {
+      logger.warn(`Order ${(data.order as any).orderNumber}: buyer has no email — skipping buyer confirmation`);
+    }
+    Promise.all(tasks).catch((err) => logger.error(`Email failed [order_placed ${(data.order as any).orderNumber}]: ${err.message}`));
   }
 
   if (data.type === "order_status" && NOTIFIABLE.has(data.newStatus)) {

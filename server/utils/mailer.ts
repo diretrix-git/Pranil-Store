@@ -10,6 +10,13 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// Verify SMTP connection on startup — logs a warning if credentials are wrong
+transporter.verify().then(() => {
+  logger.info("✅ SMTP transporter ready");
+}).catch((err) => {
+  logger.warn(`⚠️  SMTP transporter failed to connect: ${err.message} — emails will not be sent`);
+});
+
 const FROM = `"${process.env.GMAIL_FROM_NAME || "MarketHub"}" <${process.env.GMAIL_USER}>`;
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
