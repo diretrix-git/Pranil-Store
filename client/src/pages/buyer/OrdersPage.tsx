@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import Navbar from "../../components/Navbar";
 import api from "../../api/axiosInstance";
 import { formatRs } from "../../utils/formatCurrency";
+import { useAuth } from "../../context/AuthContext";
 
 const STATUS_STYLES = {
   pending: "bg-amber-100 text-amber-700",
@@ -13,15 +15,23 @@ const STATUS_STYLES = {
 };
 
 export default function OrdersPage() {
+  const navigate = useNavigate();
+  const { user, loading } = useAuth();
+
   const { data, isLoading } = useQuery({
     queryKey: ["my-orders"],
     queryFn: async () => {
       const res = await api.get("/orders/my");
       return res.data.data?.orders ?? res.data.orders ?? res.data;
     },
+    // Don't fire until auth is ready — prevents 401 on direct URL navigation
+    enabled: !loading && !!user,
+    staleTime: 30_000,
+    retry: 2,
   });
 
   const orders = Array.isArray(data) ? data : [];
+  const showSkeleton = loading || (isLoading && !!user);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -35,7 +45,7 @@ export default function OrdersPage() {
           My Orders
         </motion.h1>
 
-        {isLoading ? (
+        {showSkeleton ? (
           <div className="flex justify-center py-20">
             <div className="w-10 h-10 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
           </div>
@@ -80,9 +90,7 @@ export default function OrdersPage() {
                   </span>
                   <motion.button
                     whileTap={{ scale: 0.96 }}
-                    onClick={() =>
-                      window.open(`/invoice/${order._id}`, "_blank")
-                    }
+                    onClick={() => navigate(`/invoice/${order._id}`)}
                     className="text-xs font-semibold px-4 py-2 rounded-xl bg-violet-50 text-violet-600 hover:bg-violet-100 border border-violet-200 transition-colors"
                   >
                     View Invoice

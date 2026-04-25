@@ -21,9 +21,15 @@ export default function InvoicePage() {
       const res = await api.get(`/orders/${orderId}/invoice`);
       return res.data.data?.order ?? res.data.order ?? res.data;
     },
+    // Wait for auth before firing — prevents 401 on direct URL navigation
+    enabled: !!orderId && !!user,
+    staleTime: 60_000,
+    retry: 2,
   });
 
-  if (isLoading) return <Spinner />;
+  const { loading: authLoading } = useAuth();
+
+  if (authLoading || isLoading) return <Spinner />;
   if (!order)
     return (
       <p className="text-center py-16 text-gray-500">Invoice not found.</p>
@@ -143,7 +149,7 @@ export default function InvoicePage() {
           >
             ← Back
           </button>
-          {user?.role === "admin" && (
+          {(user?.role === "admin" || user?.role === "buyer") && (
             <button
               onClick={() => window.print()}
               className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-violet-600 hover:bg-violet-700 transition-colors"
