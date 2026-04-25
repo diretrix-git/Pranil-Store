@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import Navbar from "../../components/Navbar";
@@ -24,9 +24,12 @@ export default function CartPage() {
     },
   });
 
+  const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
   const updateQty = useMutation({
     mutationFn: ({ productId, quantity }: { productId: string; quantity: number }) => api.patch(`/cart/item/${productId}`, { quantity }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["cart"] }),
+    onError: () => queryClient.invalidateQueries({ queryKey: ["cart"] }),
   });
   const removeItem = useMutation({
     mutationFn: (productId: string) => api.delete(`/cart/item/${productId}`),
@@ -48,8 +51,21 @@ export default function CartPage() {
     onError: (err: any) => { setOrderError(err.response?.data?.message ?? "Failed to place order."); setShowCheckout(false); },
   });
 
-  const handleQtyChange = useCallback((pid: string, val: string) => { setLocalQty((prev) => ({ ...prev, [pid]: val })); }, []);
+  const handleQtyChange = useCallback((pid: string, val: string) => {
+    setLocalQty((prev) => ({ ...prev, [pid]: val }));
+    // Debounce the API call — fires 600ms after user stops typing
+    if (debounceRef.current[pid]) clearTimeout(debounceRef.current[pid]);
+    const qty = Number(val);
+    if (qty >= 1) {
+      debounceRef.current[pid] = setTimeout(() => {
+        updateQty.mutate({ productId: pid, quantity: qty });
+      }, 600);
+    }
+  }, [updateQty]);
+
   const commitQty = useCallback((pid: string, val: string | number) => {
+    // On blur/Enter: cancel pending debounce and fire immediately
+    if (debounceRef.current[pid]) clearTimeout(debounceRef.current[pid]);
     const qty = Number(val);
     if (qty >= 1) updateQty.mutate({ productId: pid, quantity: qty });
   }, [updateQty]);
@@ -96,7 +112,7 @@ export default function CartPage() {
                           <td className="px-4 py-4">
                             <input type="number" min={1} value={qty} onChange={(e) => handleQtyChange(pid, e.target.value)} onBlur={(e) => commitQty(pid, e.target.value)} onKeyDown={(e) => e.key === "Enter" && commitQty(pid, qty)} className="w-20 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-center text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 focus:bg-white transition-all" />
                           </td>
-                          <td className="px-4 py-4 font-semibold text-slate-900">{formatRs(Number(item.price) * item.quantity)}</td>
+                          <td className="px-4 py-4 font-semibold text-slate-900">{formatRs(Number(item.price) * Number(qty))}</td>
                           <td className="px-4 py-4"><button onClick={() => removeItem.mutate(pid)} className="text-red-500 hover:text-red-700 text-xs font-medium transition-colors">Remove</button></td>
                         </motion.tr>
                       );
