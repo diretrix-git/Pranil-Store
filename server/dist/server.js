@@ -55,6 +55,12 @@ if (missing.length > 0) {
     console.error("Set these in your Render dashboard under Environment.");
     process.exit(1);
 }
+// Warn about optional but important vars
+const OPTIONAL_ENV = ["GMAIL_USER", "GMAIL_APP_PASSWORD", "UPSTASH_REDIS_REST_URL"];
+const missingOptional = OPTIONAL_ENV.filter((k) => !process.env[k]);
+if (missingOptional.length > 0) {
+    console.warn(`WARNING: Optional env vars not set: ${missingOptional.join(", ")} — some features may not work`);
+}
 const PORT = Number(process.env.PORT) || 5000;
 const httpServer = http_1.default.createServer(app_1.default);
 const allowedOrigins = (process.env.CLIENT_URL || "")

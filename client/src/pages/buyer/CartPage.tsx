@@ -70,8 +70,37 @@ export default function CartPage() {
     if (qty >= 1) updateQty.mutate({ productId: pid, quantity: qty });
   }, [updateQty]);
 
+  const flushAndCheckout = useCallback(async () => {
+    // Cancel all pending debounces and flush any dirty quantities to the server
+    const pending = Object.entries(debounceRef.current);
+    if (pending.length > 0) {
+      pending.forEach(([pid, timer]) => {
+        clearTimeout(timer);
+        delete debounceRef.current[pid];
+      });
+      // Fire all dirty qty updates in parallel and wait for them
+      const dirtyPids = Object.keys(localQty);
+      if (dirtyPids.length > 0) {
+        await Promise.all(
+          dirtyPids.map((pid) => {
+            const qty = Number(localQty[pid]);
+            if (qty >= 1) return api.patch(`/cart/item/${pid}`, { quantity: qty });
+            return Promise.resolve();
+          })
+        );
+        await queryClient.invalidateQueries({ queryKey: ["cart"] });
+      }
+    }
+    setShowCheckout(true);
+  }, [localQty, queryClient]);
   const items: any[] = (cartData as any)?.items ?? [];
-  const total: number = (cartData as any)?.totalAmount ?? 0;
+  // Compute total from localQty so it stays in sync with what the user typed
+  const total: number = items.length > 0
+    ? items.reduce((sum: number, item: any) => {
+        const pid = String(item.product?._id ?? item.product ?? item.productId);
+        return sum + Number(item.price) * Number(localQty[pid] !== undefined ? localQty[pid] : item.quantity);
+      }, 0)
+    : ((cartData as any)?.totalAmount ?? 0);
   const getQty = (pid: string, fallback: number) => localQty[pid] !== undefined ? localQty[pid] : fallback;
 
   return (
@@ -125,7 +154,7 @@ export default function CartPage() {
               <motion.button whileTap={{ scale: 0.97 }} onClick={() => clearCartMutation.mutate()} className="text-sm text-slate-500 hover:text-red-500 border border-slate-200 hover:border-red-200 px-4 py-2 rounded-xl transition-all">Clear Cart</motion.button>
               <div className="text-right w-full sm:w-auto">
                 <p className="text-xl sm:text-2xl font-black text-slate-900 mb-3">Total: <span className="text-violet-600">{formatRs(total)}</span></p>
-                <motion.button whileTap={{ scale: 0.97 }} onClick={() => setShowCheckout(true)} className="w-full sm:w-auto px-8 py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:opacity-90 transition-opacity shadow-md shadow-violet-200">Checkout →</motion.button>
+                <motion.button whileTap={{ scale: 0.97 }} onClick={flushAndCheckout} className="w-full sm:w-auto px-8 py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:opacity-90 transition-opacity shadow-md shadow-violet-200">Checkout →</motion.button>
               </div>
             </div>
           </motion.div>
@@ -139,9 +168,10 @@ export default function CartPage() {
               <div className="bg-slate-50 rounded-xl p-4 mb-4 space-y-2">
                 {items.map((item) => {
                   const pid = String(item.product?._id ?? item.product ?? item.productId);
-                  return <div key={pid} className="flex justify-between text-sm"><span className="text-slate-700">{item.name} <span className="text-slate-400">× {item.quantity}</span></span><span className="font-semibold text-slate-900">{formatRs(Number(item.price) * item.quantity)}</span></div>;
+                  const qty = Number(getQty(pid, item.quantity));
+                  return <div key={pid} className="flex justify-between text-sm"><span className="text-slate-700">{item.name} <span className="text-slate-400">× {qty}</span></span><span className="font-semibold text-slate-900">{formatRs(Number(item.price) * qty)}</span></div>;
                 })}
-                <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between font-black text-slate-900"><span>Total</span><span className="text-violet-600">{formatRs(total)}</span></div>
+                <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between font-black text-slate-900"><span>Total</span><span className="text-violet-600">{formatRs(items.reduce((sum, item) => { const pid = String(item.product?._id ?? item.product ?? item.productId); return sum + Number(item.price) * Number(getQty(pid, item.quantity)); }, 0))}</span></div>
               </div>
               <div className="mb-5">
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Order Notes <span className="text-slate-400 font-normal">(optional)</span></label>

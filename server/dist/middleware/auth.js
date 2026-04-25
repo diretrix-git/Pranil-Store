@@ -31,19 +31,25 @@ const protect = async (req, res, next) => {
         const clerkUserId = payload.sub;
         if (!clerkUserId)
             return next(new AppError_1.default("Invalid token payload.", 401));
+        // Always fetch from Clerk to get the latest publicMetadata (role may have changed)
+        const clerkUser = await clerkClient.users.getUser(clerkUserId);
+        const clerkRole = clerkUser.publicMetadata?.role === "admin" ? "admin" : "buyer";
         // Find existing MongoDB user by clerkId
         let user = await User_1.default.findOne({ clerkId: clerkUserId, isDeleted: false });
         if (!user) {
-            // First login — fetch from Clerk and upsert into MongoDB
-            const clerkUser = await clerkClient.users.getUser(clerkUserId);
+            // First login — upsert into MongoDB
             const email = clerkUser.emailAddresses[0]?.emailAddress ?? "";
-            const role = clerkUser.publicMetadata?.role === "admin" ? "admin" : "buyer";
             const name = `${clerkUser.firstName ?? ""} ${clerkUser.lastName ?? ""}`.trim() || email;
             const phone = clerkUser.phoneNumbers[0]?.phoneNumber ?? "";
             user = await User_1.default.findOneAndUpdate({ email }, {
-                $set: { clerkId: clerkUserId, role },
+                $set: { clerkId: clerkUserId, role: clerkRole },
                 $setOnInsert: { name, email, phone, password: "clerk-managed" },
             }, { upsert: true, new: true });
+        }
+        else if (user.role !== clerkRole) {
+            // Role changed in Clerk — sync it to MongoDB immediately
+            user.role = clerkRole;
+            await user.save();
         }
         if (!user)
             return next(new AppError_1.default("User not found.", 401));

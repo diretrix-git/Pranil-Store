@@ -5,12 +5,20 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.sendPasswordResetEmail = exports.sendAdminNotification = exports.sendOrderStatusUpdate = exports.sendBuyerConfirmation = void 0;
 const nodemailer_1 = __importDefault(require("nodemailer"));
+const logger_1 = __importDefault(require("./logger"));
 const transporter = nodemailer_1.default.createTransport({
     service: "gmail",
     auth: {
         user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_APP_PASSWORD,
+        // Strip spaces — Google shows the app password with spaces but Nodemailer needs it without
+        pass: (process.env.GMAIL_APP_PASSWORD ?? "").replace(/\s+/g, ""),
     },
+});
+// Verify SMTP connection on startup — logs a warning if credentials are wrong
+transporter.verify().then(() => {
+    logger_1.default.info("✅ SMTP transporter ready");
+}).catch((err) => {
+    logger_1.default.warn(`⚠️  SMTP transporter failed to connect: ${err.message} — emails will not be sent`);
 });
 const FROM = `"${process.env.GMAIL_FROM_NAME || "MarketHub"}" <${process.env.GMAIL_USER}>`;
 // ── Shared helpers ────────────────────────────────────────────────────────────
