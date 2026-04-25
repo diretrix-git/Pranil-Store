@@ -2,8 +2,8 @@
 .env
 .env.local
 .env.*.local
-.env.production
 .env.development
+# .env.production is committed intentionally — only contains public VITE_* vars (no secrets)
 # Keep .env.example files (they document required vars, no secrets)
 
 # ── Dependencies ──────────────────────────────────────────────────────────────
