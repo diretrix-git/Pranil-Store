@@ -60,6 +60,8 @@ export default function HomePage() {
       const res = await api.get("/products", { params });
       return res.data;
     },
+    staleTime: 2 * 60 * 1000, // match server cache TTL — avoids redundant refetches
+    placeholderData: (prev) => prev, // keep showing previous results while new ones load
   });
   const products: IProduct[] = data?.data?.products ?? data?.products ?? [];
   const hasFilters = category || vendor || minPrice || maxPrice || search;
