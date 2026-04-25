@@ -57,7 +57,11 @@ export const getProducts = async (req: Request, res: Response, next: NextFunctio
 
     const query: any = { isActive: true, isDeleted: false };
 
-    if (req.query.search) query.name = { $regex: req.query.search, $options: "i" };
+    if (req.query.search) {
+      // Escape regex special chars to prevent ReDoS
+      const escaped = (req.query.search as string).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").slice(0, 100);
+      query.name = { $regex: escaped, $options: "i" };
+    }
 
     if (req.query.category) {
       const cat = await Category.findOne({ $or: [{ slug: req.query.category }, { name: req.query.category }] });
@@ -131,7 +135,12 @@ export const updateProduct = async (req: Request, res: Response, next: NextFunct
       }
     }
 
-    Object.assign(product, req.body);
+    const allowed = ["name", "description", "price", "stock", "unit", "categories", "category", "vendor", "images", "isActive"];
+    const updates: any = {};
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) updates[key] = req.body[key];
+    }
+    Object.assign(product, updates);
     await product.save();
     await product.populate(POPULATE_OPTS);
 

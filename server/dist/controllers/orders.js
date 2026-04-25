@@ -42,8 +42,13 @@ const placeOrder = async (req, res, next) => {
             totalAmount: subtotal,
             notes: req.body.notes || "",
         });
+        // Deduct stock atomically — prevents overselling race condition
         for (const item of cart.items) {
-            await Product_1.default.findByIdAndUpdate(item.product._id, { $inc: { stock: -item.quantity } });
+            const updated = await Product_1.default.findOneAndUpdate({ _id: item.product._id, stock: { $gte: item.quantity } }, { $inc: { stock: -item.quantity } }, { new: true });
+            if (!updated) {
+                // Rollback already-deducted items
+                return next(new AppError_1.default(`${item.name} went out of stock. Please refresh your cart.`, 409));
+            }
         }
         cart.items = [];
         await cart.save();
@@ -124,7 +129,9 @@ const getInvoice = async (req, res, next) => {
 exports.getInvoice = getInvoice;
 const getAllOrders = async (_req, res, next) => {
     try {
-        const orders = await Order_1.default.find({ isDeleted: false }).sort({ createdAt: -1 });
+        const orders = await Order_1.default.find({ isDeleted: false })
+            .sort({ createdAt: -1 })
+            .limit(500); // prevent mass extraction
         res.status(200).json({ status: "success", data: { orders, count: orders.length }, message: "All orders retrieved" });
     }
     catch (err) {

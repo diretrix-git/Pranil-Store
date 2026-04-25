@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "npx ts-node server.ts",
-    "build": "tsc --skipLibCheck",
+    "build": "npm install --include=dev && tsc --skipLibCheck",
     "start": "node dist/server.js",
     "seed": "npx ts-node seed.ts",
     "seed:fresh": "npx ts-node seed.ts --fresh",

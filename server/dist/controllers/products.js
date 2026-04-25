@@ -56,8 +56,11 @@ const getProducts = async (req, res, next) => {
             return;
         }
         const query = { isActive: true, isDeleted: false };
-        if (req.query.search)
-            query.name = { $regex: req.query.search, $options: "i" };
+        if (req.query.search) {
+            // Escape regex special chars to prevent ReDoS
+            const escaped = req.query.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").slice(0, 100);
+            query.name = { $regex: escaped, $options: "i" };
+        }
         if (req.query.category) {
             const cat = await Category_1.default.findOne({ $or: [{ slug: req.query.category }, { name: req.query.category }] });
             if (cat)
@@ -134,7 +137,13 @@ const updateProduct = async (req, res, next) => {
                     req.body.category = cat.name;
             }
         }
-        Object.assign(product, req.body);
+        const allowed = ["name", "description", "price", "stock", "unit", "categories", "category", "vendor", "images", "isActive"];
+        const updates = {};
+        for (const key of allowed) {
+            if (req.body[key] !== undefined)
+                updates[key] = req.body[key];
+        }
+        Object.assign(product, updates);
         await product.save();
         await product.populate(POPULATE_OPTS);
         // Invalidate this product and all list caches
