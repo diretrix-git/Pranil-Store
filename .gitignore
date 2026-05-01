@@ -40,3 +40,6 @@ coverage/
 *.tgz
 *.zip
 .cache/
+
+# ── Local AI context (never push) ─────────────────────────────────────────────
+PROJECT_CONTEXT.md
