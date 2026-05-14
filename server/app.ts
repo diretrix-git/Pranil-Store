@@ -29,6 +29,11 @@ if (process.env.NODE_ENV === "development") app.use(morgan("dev"));
 // Global rate limit — 200 req/min per IP
 app.use(generalLimiter);
 
+// Health check — used by cron jobs to keep the Render instance awake
+app.get("/health", (_req, res) => {
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
 import authRoutes from "./routes/auth";
 import categoryRoutes from "./routes/categories";
 import vendorRoutes from "./routes/vendors";
