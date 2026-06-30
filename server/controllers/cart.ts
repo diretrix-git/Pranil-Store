@@ -30,6 +30,12 @@ export const addItem = async (req: Request, res: Response, next: NextFunction): 
     const { productId, quantity = 1 } = req.body;
     const userId = (req as any).user._id;
 
+    // Validate quantity — must be a positive integer, capped at 500
+    const qty = Number(quantity);
+    if (!Number.isInteger(qty) || qty < 1 || qty > 500) {
+      return next(new AppError("Quantity must be a whole number between 1 and 500.", 400));
+    }
+
     const product = await Product.findOne({ _id: productId, isActive: true, isDeleted: false });
     if (!product) return next(new AppError("Product not found.", 404));
 
@@ -40,7 +46,7 @@ export const addItem = async (req: Request, res: Response, next: NextFunction): 
       (i) => i.product && i.product.toString() === productId.toString(),
     );
     if (existingIndex >= 0) {
-      cart.items[existingIndex].quantity += quantity;
+      cart.items[existingIndex].quantity += qty;
     } else {
       cart.items.push({
         product: product._id,
@@ -60,6 +66,13 @@ export const addItem = async (req: Request, res: Response, next: NextFunction): 
 export const updateItem = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { quantity } = req.body;
+
+    // Validate quantity — 0 means remove, max 500
+    const qty = Number(quantity);
+    if (!Number.isInteger(qty) || qty < 0 || qty > 500) {
+      return next(new AppError("Quantity must be a whole number between 0 and 500.", 400));
+    }
+
     const cart = await Cart.findOne({ buyer: (req as any).user._id });
     if (!cart) return next(new AppError("Cart not found.", 404));
 
@@ -68,10 +81,10 @@ export const updateItem = async (req: Request, res: Response, next: NextFunction
     );
     if (itemIndex === -1) return next(new AppError("Item not found in cart.", 404));
 
-    if (quantity <= 0) {
+    if (qty <= 0) {
       cart.items.splice(itemIndex, 1);
     } else {
-      cart.items[itemIndex].quantity = quantity;
+      cart.items[itemIndex].quantity = qty;
     }
 
     await cart.save();

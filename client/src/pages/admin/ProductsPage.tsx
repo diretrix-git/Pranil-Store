@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
 import api from '../../api/axiosInstance';
 import { formatRs } from '../../utils/formatCurrency';
 
@@ -20,7 +21,6 @@ export default function AdminProductsPage() {
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [imageFiles, setImageFiles] = useState([]);
   const [deleteId, setDeleteId] = useState(null);
-  const [formError, setFormError] = useState('');
 
   const { data: catData } = useQuery({
     queryKey: ['categories'],
@@ -59,13 +59,20 @@ export default function AdminProductsPage() {
       imageFiles.forEach((f) => fd.append('images', f));
       return editProduct ? api.put(`/products/${editProduct._id}`, fd) : api.post('/products', fd);
     },
-    onSuccess: () => { queryClient.invalidateQueries(['admin-products']); setShowModal(false); },
-    onError: (err) => setFormError(err.response?.data?.message ?? 'Failed to save product.'),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['admin-products']);
+      setShowModal(false);
+      toast.success(editProduct ? 'Product updated!' : 'Product created!', {
+        description: editProduct ? 'Changes saved successfully.' : 'New product is now live in the catalogue.',
+      });
+    },
+    onError: (err) => toast.error('Failed to save product', { description: err.response?.data?.message ?? 'Please check your inputs and try again.' }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id) => api.delete(`/products/${id}`),
-    onSuccess: () => { queryClient.invalidateQueries(['admin-products']); setDeleteId(null); },
+    onSuccess: () => { queryClient.invalidateQueries(['admin-products']); setDeleteId(null); toast.success('Product deleted.'); },
+    onError: () => { setDeleteId(null); toast.error('Failed to delete product.'); },
   });
 
   return (
@@ -151,7 +158,7 @@ export default function AdminProductsPage() {
                 <h2 className="text-lg font-black text-slate-900">{editProduct ? 'Edit Product' : 'New Product'}</h2>
                 <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 font-bold">✕</button>
               </div>
-              {formError && <p className="text-red-500 text-sm mb-4 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{formError}</p>}
+              {/* No inline formError — errors show via toast */}
               <div className="space-y-4">
                 {[
                   { name: 'name', label: 'Product Name *', placeholder: 'e.g. Wireless Headphones' },

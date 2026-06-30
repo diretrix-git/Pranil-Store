@@ -142,10 +142,25 @@ export default function HomePage() {
           {isLoading ? (
             <div className="flex justify-center py-20"><div className="w-10 h-10 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" /></div>
           ) : products.length === 0 ? (
-            <div className="text-center py-20 bg-white rounded-xl border border-slate-200">
-              <p className="text-4xl mb-3">🔍</p><p className="text-slate-500 font-medium">No products found</p>
-              {hasFilters && <button onClick={clearAll} className="mt-4 text-sm text-violet-600 font-semibold hover:underline">Clear all filters</button>}
-            </div>
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-slate-200 shadow-sm"
+            >
+              <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-5 border border-slate-100">
+                <span className="text-3xl">🔍</span>
+              </div>
+              <h3 className="text-base font-bold text-slate-800 mb-1">No products found</h3>
+              <p className="text-slate-400 text-sm mb-5 max-w-xs text-center">Try adjusting your filters or search term to find what you're looking for.</p>
+              {hasFilters && (
+                <button
+                  onClick={clearAll}
+                  className="px-5 py-2 rounded-xl text-sm font-semibold text-violet-600 border border-violet-200 hover:bg-violet-50 transition-colors"
+                >
+                  Clear all filters
+                </button>
+              )}
+            </motion.div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
               {products.map((product) => <ProductCard key={product._id} product={product} />)}

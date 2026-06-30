@@ -51,12 +51,23 @@ export default function OrdersPage() {
           </div>
         ) : orders.length === 0 ? (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center py-20"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col items-center justify-center py-24 text-center"
           >
-            <p className="text-5xl mb-4">📦</p>
-            <p className="text-slate-400 text-lg">No orders yet.</p>
+            <div className="w-24 h-24 bg-indigo-50 rounded-full flex items-center justify-center mb-6 border border-indigo-100">
+              <span className="text-4xl">📦</span>
+            </div>
+            <h2 className="text-xl font-bold text-slate-800 mb-2">No orders yet</h2>
+            <p className="text-slate-400 text-sm mb-6 max-w-xs">
+              Once you place an order, you'll be able to track it and view invoices here.
+            </p>
+            <a
+              href="/"
+              className="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:opacity-90 transition-opacity shadow-md shadow-violet-200"
+            >
+              Start Shopping
+            </a>
           </motion.div>
         ) : (
           <motion.div

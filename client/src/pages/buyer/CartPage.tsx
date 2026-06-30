@@ -1,6 +1,8 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
+import { Link } from "react-router-dom";
+import { toast } from "sonner";
 import Navbar from "../../components/Navbar";
 import api from "../../api/axiosInstance";
 import { formatRs } from "../../utils/formatCurrency";
@@ -10,8 +12,6 @@ export default function CartPage() {
   const [priceWarning, setPriceWarning] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
   const [notes, setNotes] = useState("");
-  const [successMsg, setSuccessMsg] = useState("");
-  const [orderError, setOrderError] = useState("");
   const [localQty, setLocalQty] = useState<Record<string, number | string>>({});
 
   const { data: cartData, isLoading } = useQuery({
@@ -45,10 +45,18 @@ export default function CartPage() {
       queryClient.invalidateQueries({ queryKey: ["cart"] });
       setShowCheckout(false);
       setNotes("");
-      setSuccessMsg("🎉 Order placed successfully! You can view it in My Orders.");
-      setTimeout(() => setSuccessMsg(""), 6000);
+      toast.success("Order placed! 🎉", {
+        description: "Check My Orders to view details and your invoice.",
+        duration: 6000,
+        action: { label: "View Orders", onClick: () => window.location.href = "/orders" },
+      });
     },
-    onError: (err: any) => { setOrderError(err.response?.data?.message ?? "Failed to place order."); setShowCheckout(false); },
+    onError: (err: any) => {
+      setShowCheckout(false);
+      toast.error("Order failed", {
+        description: err.response?.data?.message ?? "Failed to place order. Please try again.",
+      });
+    },
   });
 
   const handleQtyChange = useCallback((pid: string, val: string) => {
@@ -105,20 +113,34 @@ export default function CartPage() {
       <Navbar />
       <div className="max-w-4xl mx-auto px-4 py-8 sm:py-10">
         <motion.h1 initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="text-2xl sm:text-3xl font-black text-slate-900 mb-6">Your Cart</motion.h1>
-        {priceWarning && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-amber-50 border border-amber-200 text-amber-700 text-sm rounded-xl px-4 py-3 mb-5">⚠️ Some prices changed since you added items. Please review before ordering.</motion.div>}
-        <AnimatePresence>
-          {successMsg && (
-            <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} className="bg-green-50 border border-green-200 text-green-700 text-sm rounded-xl px-4 py-4 mb-5 flex items-start gap-3">
-              <span className="text-lg shrink-0">✅</span>
-              <div><p className="font-semibold">{successMsg}</p><p className="text-xs text-green-600 mt-0.5">Check <a href="/orders" className="underline font-semibold">My Orders</a> to view your order details and invoice.</p></div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-        {orderError && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-3 mb-5">⚠️ {orderError}</motion.div>}
+        {priceWarning && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-amber-50 border border-amber-200 text-amber-700 text-sm rounded-xl px-4 py-3 mb-5 flex items-center gap-2">
+            <span className="shrink-0 text-base">⚠️</span>
+            Some prices changed since you added items. Please review before ordering.
+          </motion.div>
+        )}
         {isLoading ? (
-          <div className="flex justify-center py-20"><div className="w-10 h-10 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" /></div>
+          <div className="flex justify-center py-24">
+            <div className="w-10 h-10 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
+          </div>
         ) : items.length === 0 ? (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-20"><p className="text-5xl mb-4">🛒</p><p className="text-slate-400 text-lg">Your cart is empty.</p></motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col items-center justify-center py-24 text-center"
+          >
+            <div className="w-24 h-24 bg-violet-50 rounded-full flex items-center justify-center mb-6 border border-violet-100">
+              <span className="text-4xl">🛒</span>
+            </div>
+            <h2 className="text-xl font-bold text-slate-800 mb-2">Your cart is empty</h2>
+            <p className="text-slate-400 text-sm mb-6 max-w-xs">Browse our catalogue and add items to get started with your order.</p>
+            <Link
+              to="/"
+              className="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:opacity-90 transition-opacity shadow-md shadow-violet-200"
+            >
+              Browse Products
+            </Link>
+          </motion.div>
         ) : (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
             <div className="hidden sm:block bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm mb-5">

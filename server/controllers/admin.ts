@@ -15,6 +15,11 @@ export const getAllUsers = async (_req: Request, res: Response, next: NextFuncti
 
 export const toggleUserStatus = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
+    // Prevent admin from deactivating their own account
+    if (req.params.id === String((req as any).user._id)) {
+      return next(new AppError("You cannot deactivate your own account.", 400));
+    }
+
     const user = await User.findOne({ _id: req.params.id, isDeleted: false });
     if (!user) return next(new AppError("User not found.", 404));
     user.isActive = !user.isActive;

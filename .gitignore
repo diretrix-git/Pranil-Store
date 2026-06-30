@@ -1,10 +1,15 @@
 # ── Environment variables ─────────────────────────────────────────────────────
+# NEVER commit .env files — use your deployment platform's env manager
 .env
-.env.local
-.env.*.local
-.env.development
-# .env.production is committed intentionally — only contains public VITE_* vars (no secrets)
-# Keep .env.example files (they document required vars, no secrets)
+.env.*
+!.env.example
+# Explicit per-package coverage
+server/.env
+server/.env.*
+client/.env
+client/.env.*
+!server/.env.example
+!client/.env.example
 
 # ── Dependencies ──────────────────────────────────────────────────────────────
 node_modules/

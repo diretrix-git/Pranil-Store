@@ -52,8 +52,9 @@ orderSchema.pre("save", function () {
     const yyyy = now.getFullYear();
     const mm = String(now.getMonth() + 1).padStart(2, "0");
     const dd = String(now.getDate()).padStart(2, "0");
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    const rand = Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+    // Use crypto.randomBytes for secure, collision-resistant order numbers
+    const { randomBytes } = require("crypto");
+    const rand = randomBytes(3).toString("hex").toUpperCase(); // 16M+ combinations
     this.orderNumber = `ORD-${yyyy}${mm}${dd}-${rand}`;
   }
 });
