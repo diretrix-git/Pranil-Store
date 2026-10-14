@@ -11,12 +11,19 @@
 
 import "dotenv/config";
 import mongoose from "mongoose";
+import { randomBytes } from "crypto";
 import { createClerkClient } from "@clerk/express";
 import User from "../models/User";
 
-const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
-
 async function run() {
+  const required = ["MONGO_URI", "CLERK_SECRET_KEY", "ADMIN_PASSWORD"] as const;
+  const missing = required.filter((key) => !process.env[key]?.trim());
+  if (missing.length > 0) throw new Error(`Missing required Clerk migration variables: ${missing.join(", ")}`);
+  if ((process.env.ADMIN_PASSWORD as string).length < 12) {
+    throw new Error("Clerk admin migration password must be at least 12 characters.");
+  }
+
+  const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
   await mongoose.connect(process.env.MONGO_URI as string);
   console.log("✅ Connected to MongoDB\n");
 
@@ -41,7 +48,7 @@ async function run() {
         const isAdmin = user.role === "admin";
         const password = isAdmin
           ? (process.env.ADMIN_PASSWORD as string)
-          : `Temp_${Math.random().toString(36).slice(2, 10)}@1`;
+          : `${randomBytes(24).toString("base64url")}Aa1!`;
 
         const nameParts = user.name.trim().split(" ");
         const firstName = nameParts[0] || "User";
@@ -58,7 +65,7 @@ async function run() {
 
         console.log(
           isAdmin
-            ? `✅ Admin created: ${user.email} (password: ${password})`
+            ? `✅ Admin created: ${user.email}`
             : `✅ Buyer created: ${user.email} (temp password set — tell them to use Forgot Password)`
         );
       }

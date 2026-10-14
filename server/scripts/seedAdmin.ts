@@ -12,7 +12,13 @@ import bcrypt from "bcryptjs";
 import User from "../models/User";
 
 async function seedAdmin() {
-  await mongoose.connect(process.env.MONGO_URI as string);
+  const { MONGO_URI, ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NAME } = process.env;
+  const required = ["MONGO_URI", "ADMIN_EMAIL", "ADMIN_PASSWORD", "ADMIN_NAME"] as const;
+  const missing = required.filter((key) => !process.env[key]?.trim());
+  if (missing.length > 0) throw new Error(`Missing required admin seed variables: ${missing.join(", ")}`);
+  if ((ADMIN_PASSWORD as string).length < 12) throw new Error("Admin seed password must be at least 12 characters.");
+
+  await mongoose.connect(MONGO_URI as string);
   console.log("✅ Connected to MongoDB\n");
 
   const existing = await User.findOne({ role: "admin" });
@@ -23,14 +29,7 @@ async function seedAdmin() {
     process.exit(0);
   }
 
-  const { ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NAME } = process.env;
-
-  if (!ADMIN_EMAIL || !ADMIN_PASSWORD || !ADMIN_NAME) {
-    console.error("❌ Missing ADMIN_EMAIL, ADMIN_PASSWORD, or ADMIN_NAME in .env");
-    process.exit(1);
-  }
-
-  const hashed = await bcrypt.hash(ADMIN_PASSWORD, 12);
+  const hashed = await bcrypt.hash(ADMIN_PASSWORD as string, 12);
   await User.create({
     name: ADMIN_NAME,
     email: ADMIN_EMAIL,

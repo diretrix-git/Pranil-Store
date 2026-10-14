@@ -15,10 +15,18 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 require("dotenv/config");
 const mongoose_1 = __importDefault(require("mongoose"));
+const crypto_1 = require("crypto");
 const express_1 = require("@clerk/express");
 const User_1 = __importDefault(require("../models/User"));
-const clerk = (0, express_1.createClerkClient)({ secretKey: process.env.CLERK_SECRET_KEY });
 async function run() {
+    const required = ["MONGO_URI", "CLERK_SECRET_KEY", "ADMIN_PASSWORD"];
+    const missing = required.filter((key) => !process.env[key]?.trim());
+    if (missing.length > 0)
+        throw new Error(`Missing required Clerk migration variables: ${missing.join(", ")}`);
+    if (process.env.ADMIN_PASSWORD.length < 12) {
+        throw new Error("Clerk admin migration password must be at least 12 characters.");
+    }
+    const clerk = (0, express_1.createClerkClient)({ secretKey: process.env.CLERK_SECRET_KEY });
     await mongoose_1.default.connect(process.env.MONGO_URI);
     console.log("✅ Connected to MongoDB\n");
     const users = await User_1.default.find({ isDeleted: false });
@@ -40,7 +48,7 @@ async function run() {
                 const isAdmin = user.role === "admin";
                 const password = isAdmin
                     ? process.env.ADMIN_PASSWORD
-                    : `Temp_${Math.random().toString(36).slice(2, 10)}@1`;
+                    : `${(0, crypto_1.randomBytes)(24).toString("base64url")}Aa1!`;
                 const nameParts = user.name.trim().split(" ");
                 const firstName = nameParts[0] || "User";
                 const lastName = nameParts.slice(1).join(" ") || undefined;
@@ -53,7 +61,7 @@ async function run() {
                     skipPasswordChecks: true,
                 });
                 console.log(isAdmin
-                    ? `✅ Admin created: ${user.email} (password: ${password})`
+                    ? `✅ Admin created: ${user.email}`
                     : `✅ Buyer created: ${user.email} (temp password set — tell them to use Forgot Password)`);
             }
             // Ensure role is set in publicMetadata

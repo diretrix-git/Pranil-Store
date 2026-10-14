@@ -1,16 +1,6 @@
 "use strict";
 /**
- * Seed Script — MarketHub
- *
- * Creates:
- *   - Categories (Electronics, Clothing, Food, Books, Home, Sports)
- *   - 1 Admin     →  taroluffy71@gmail.com / PSWNAITHAXAINA@6430
- *   - 1 Buyer     →  buyer@markethub.com / Buyer@1234
- *   - 3 Sample products
- *
- * Usage:
- *   npx ts-node seed.ts           — skip existing records
- *   npx ts-node seed.ts --fresh   — wipe everything and re-seed
+ * Optional local database seed. Account credentials come from environment variables.
  */
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
@@ -33,16 +23,16 @@ const CATEGORIES = [
 ];
 const ADMIN = {
     name: process.env.ADMIN_NAME || "Admin",
-    email: process.env.ADMIN_EMAIL || "admin@markethub.com",
+    email: process.env.ADMIN_EMAIL,
     phone: "+1234567890",
-    password: process.env.ADMIN_PASSWORD || "Admin@1234",
+    password: process.env.ADMIN_PASSWORD,
     role: "admin",
 };
 const BUYER = {
     name: "Demo Buyer",
-    email: "buyer@markethub.com",
+    email: process.env.SEED_BUYER_EMAIL,
     phone: "+1234567892",
-    password: "Buyer@1234",
+    password: process.env.SEED_BUYER_PASSWORD,
     role: "buyer",
 };
 const PRODUCTS = [
@@ -58,9 +48,19 @@ async function upsertUser(data) {
     }
     const hashed = await bcryptjs_1.default.hash(data.password, 12);
     await User_1.default.create({ ...data, password: hashed });
-    console.log(`   ✅ ${data.email} / ${data.password}`);
+    console.log(`   Created ${data.role}: ${data.email}`);
 }
 async function seed() {
+    const required = ["MONGO_URI", "ADMIN_EMAIL", "ADMIN_PASSWORD", "SEED_BUYER_EMAIL", "SEED_BUYER_PASSWORD"];
+    const missing = required.filter((key) => !process.env[key]?.trim());
+    if (missing.length > 0)
+        throw new Error(`Missing required seed variables: ${missing.join(", ")}`);
+    if (process.env.ADMIN_PASSWORD.length < 12 || process.env.SEED_BUYER_PASSWORD.length < 12) {
+        throw new Error("Seed account passwords must be at least 12 characters.");
+    }
+    if (process.env.ADMIN_EMAIL?.trim().toLowerCase() === process.env.SEED_BUYER_EMAIL?.trim().toLowerCase()) {
+        throw new Error("Admin and buyer seed accounts must use different email addresses.");
+    }
     console.log("\n🌱  MarketHub Seed Script — Target: MongoDB Atlas\n");
     await mongoose_1.default.connect(process.env.MONGO_URI);
     console.log("✅ Connected\n");
@@ -106,8 +106,8 @@ async function seed() {
     }
     console.log("\n─────────────────────────────────────────");
     console.log("✅ Done!\n");
-    console.log(`  👑 Admin : ${ADMIN.email} / ${ADMIN.password}`);
-    console.log(`  🛒 Buyer : ${BUYER.email} / ${BUYER.password}`);
+    console.log(`  Admin : ${ADMIN.email}`);
+    console.log(`  Buyer : ${BUYER.email}`);
     console.log("─────────────────────────────────────────\n");
     await mongoose_1.default.disconnect();
     process.exit(0);
