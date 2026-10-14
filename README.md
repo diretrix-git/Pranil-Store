@@ -1,307 +1,122 @@
-# MarketHub — B2B Multi-Vendor Marketplace
+# Pranil Store
 
-A production-ready full-stack B2B marketplace built with the **MERN stack** + TypeScript. Admins manage products, vendors, categories, orders and buyers. Buyers browse, cart, and order. Real-time notifications, email queues, Redis caching, and rate limiting included.
+Pranil Store is a B2B marketplace where buyers browse products from multiple vendors, maintain a cart, place and track orders, and print invoices. Administrators manage the catalog, vendors, buyers, orders, and contact messages.
 
----
+## Implemented features
 
-## Tech Stack
+- Buyer and admin roles. Buyers sign in through Clerk components; an admin role is assigned through Clerk public metadata and synchronized to MongoDB.
+- Product catalog with search and category, vendor, and price filters.
+- Admin management for products, categories, vendors, buyer accounts, orders, and contact messages.
+- Persistent carts, stock checks and deduction during checkout, order status management, and print-ready invoices.
+- Cloudinary image uploads for admin-managed product images.
+- Admin dashboard metrics and authenticated Socket.IO notifications for new orders and contact messages.
+- Optional Upstash Redis caching for catalog data.
+- Order and status emails sent through Gmail SMTP using Nodemailer. Sending is asynchronous and fire-and-forget; it is not backed by a durable queue.
 
-| Layer          | Technology                                                                 |
-| -------------- | -------------------------------------------------------------------------- |
-| Frontend       | React 18 + Vite, TypeScript, React Router v7, TanStack Query, Zustand, Framer Motion, Tailwind CSS v4 |
-| Backend        | Node.js, Express 4, TypeScript, Mongoose                                   |
-| Database       | MongoDB Atlas                                                              |
-| Auth           | Clerk (hosted sign-in/sign-up, session tokens)                             |
-| Cache          | Upstash Redis (products, categories, vendors)                              |
-| Email Queue    | BullMQ + Upstash Redis                                                     |
-| Email Delivery | Nodemailer (Gmail)                                                         |
-| File Storage   | Cloudinary                                                                 |
-| Monitoring     | Sentry, Winston                                                            |
+Vendors are catalog records managed by admins. There is no seller account or seller dashboard. Checkout records orders and stock; payment processing is not implemented.
 
----
+## Tech stack
 
-## Project Structure
+| Area | Technologies |
+| --- | --- |
+| Frontend | React 18, Vite, TypeScript, React Router, TanStack Query, Zustand, Tailwind CSS, Framer Motion |
+| Backend | Node.js 20+, Express 4, TypeScript, Mongoose |
+| Authentication | Clerk sign-in/sign-up components and session tokens |
+| Data | MongoDB; optional Upstash Redis over REST for caching |
+| Media and email | Cloudinary; Nodemailer with Gmail SMTP |
+| Realtime and monitoring | Socket.IO; Winston; optional Sentry |
 
-```
-markethub/
-├── client/                     # React/Vite frontend (TypeScript)
-│   ├── src/
-│   │   ├── api/                # Axios instance (auto-attaches Clerk token)
-│   │   ├── components/         # Navbar, ProtectedRoute, ProductCard, etc.
-│   │   ├── context/            # AuthContext (Clerk → MongoDB sync)
-│   │   ├── hooks/              # useAdminNotifications
-│   │   ├── layouts/            # AdminLayout (persistent sidebar)
-│   │   ├── pages/
-│   │   │   ├── admin/          # Dashboard, Products, Categories, Vendors, Orders, Users, Messages
-│   │   │   └── buyer/          # Home, Product, Cart, Orders, Invoice
-│   │   ├── store/              # Zustand notification store
-│   │   ├── types/              # Shared TypeScript interfaces
-│   │   └── utils/              # formatCurrency, socket
-│   ├── .env.example
-│   └── tsconfig.json
-│
-├── server/                     # Express backend (TypeScript)
-│   ├── config/                 # DB, Cloudinary, Redis (Upstash)
-│   ├── controllers/            # Route handlers with caching
-│   ├── middleware/             # Clerk auth, rate limiter, error handler
-│   ├── models/                 # Mongoose schemas (User, Product, Order, Cart, Vendor, Category, Contact)
-│   ├── queues/                 # BullMQ email queue + worker
-│   ├── routes/                 # Express routers
-│   ├── scripts/                # DB migration scripts
-│   ├── types/                  # Shared TypeScript interfaces
-│   ├── utils/                  # Logger, AppError, Cloudinary helpers, Mailer
-│   ├── validators/             # express-validator chains
-│   ├── seed.ts                 # Full database seed (categories + admin + buyer + products)
-│   └── .env.example
-│
-└── nginx.conf                  # Nginx reverse proxy config (for VPS deployment)
-```
+## Deployment
 
----
+The repository includes a [Render Blueprint](render.yaml) for a Node web service and a static frontend. The frontend has an SPA rewrite for client-side routes. The Blueprint installs backend dependencies and starts the tracked `server/dist/server.js` output. If backend TypeScript source changes, compile it and review the resulting `server/dist` changes before deployment. The repository's `server/package.json` also defines a build script, but the current Blueprint does not call it.
 
-## Getting Started
+To deploy your own instance, connect the repository to Render and configure the backend environment variables listed below in the service dashboard. Set `CLIENT_URL` to the frontend origin(s), separated by commas, and set the static site's `VITE_API_URL` and `VITE_CLERK_PUBLISHABLE_KEY` build environment variables. The committed `client/.env.production` also supplies an API URL and Clerk publishable key for production frontend builds; replace these for your own deployment. Vite embeds `VITE_*` values in the public client bundle.
 
-### Prerequisites
+`nginx.conf` is present for a possible manually managed VPS setup; the Render Blueprint does not use it. The project contains a Vercel SPA rewrite file, but the documented deployment is Render.
 
-- Node.js 20+
-- MongoDB Atlas account
-- Cloudinary account
-- Clerk account (https://clerk.com)
-- Upstash Redis account (https://upstash.com)
+## Local development
 
-### 1. Clone
+### Requirements
+
+- Node.js 20 or newer and npm
+- A MongoDB database
+- A Clerk application (publishable and secret keys)
+- Cloudinary credentials for product image uploads
+- Optional: Upstash Redis REST credentials for caching
+- Optional: Gmail SMTP app credentials for email notifications
+
+### Setup
 
 ```bash
-git clone https://github.com/your-username/markethub.git
-cd markethub
+git clone https://github.com/diretrix-git/Pranil-Store.git
+cd Pranil-Store
+
+cp server/.env.example server/.env
+cp client/.env.example client/.env
 ```
 
-### 2. Server environment
+The `cp` commands also work in PowerShell as aliases for `Copy-Item`. Fill in the local environment files before starting the services. `MONGO_URI`, `CLERK_SECRET_KEY`, and `CLERK_PUBLISHABLE_KEY` are required by the backend at startup. `CLIENT_URL` should include the frontend origin, normally `http://localhost:5173`.
+
+Install each app's dependencies and start the development servers in separate terminals:
 
 ```bash
 cd server
-cp .env.example .env
+npm install
+npm run dev
 ```
-
-Fill in `server/.env`:
-
-```env
-PORT=5000
-NODE_ENV=development
-MONGO_URI=mongodb+srv://...
-CLIENT_URL=http://localhost:5173
-
-# Clerk
-CLERK_PUBLISHABLE_KEY=pk_test_...
-CLERK_SECRET_KEY=sk_test_...
-
-# Cloudinary
-CLOUDINARY_CLOUD_NAME=...
-CLOUDINARY_API_KEY=...
-CLOUDINARY_API_SECRET=...
-
-# Gmail (Nodemailer — requires 2FA App Password)
-GMAIL_USER=you@gmail.com
-GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
-GMAIL_FROM_NAME=MarketHub
-
-# Upstash Redis
-UPSTASH_REDIS_REST_URL=https://...upstash.io
-UPSTASH_REDIS_REST_TOKEN=...
-
-# Admin seed
-ADMIN_EMAIL=admin@yourdomain.com
-ADMIN_PASSWORD=StrongPass@123
-ADMIN_NAME=Admin
-```
-
-### 3. Client environment
 
 ```bash
 cd client
-cp .env.example .env
+npm install
+npm run dev
 ```
 
-```env
-VITE_API_URL=http://localhost:5000/api/v1
-VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
-```
+The frontend runs at `http://localhost:5173`; the API runs at `http://localhost:5000/api/v1`.
 
-### 4. Install dependencies
+### Environment variables
 
-```bash
-cd server && npm install
-cd ../client && npm install
-```
+The committed examples are `server/.env.example` and `client/.env.example`.
 
-### 5. Seed the database
+| Variable | App | Purpose |
+| --- | --- | --- |
+| `MONGO_URI` | Server | MongoDB connection string (required) |
+| `CLERK_SECRET_KEY` | Server | Verifies Clerk sessions (required) |
+| `CLERK_PUBLISHABLE_KEY` | Server | Clerk application key required by backend startup |
+| `CLIENT_URL` | Server | Comma-separated allowed frontend origins for CORS |
+| `PORT`, `NODE_ENV` | Server | Port (defaults to `5000`) and runtime environment |
+| `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Server | Cloudinary image uploads |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Server | Optional catalog caching; caching is skipped if unset or unavailable |
+| `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `GMAIL_FROM_NAME` | Server | Gmail SMTP email delivery |
+| `ADMIN_EMAIL` | Server | New-order email recipient and admin seed account address |
+| `ADMIN_PASSWORD`, `ADMIN_NAME` | Server | Explicit admin credentials used by optional seed and migration scripts |
+| `SEED_BUYER_EMAIL`, `SEED_BUYER_PASSWORD` | Server | Explicit demo buyer credentials required by `npm run seed` |
+| `SENTRY_DSN` | Server | Optional Sentry reporting |
+| `VITE_API_URL` | Client | API base URL, including `/api/v1` |
+| `VITE_CLERK_PUBLISHABLE_KEY` | Client | Clerk frontend application key |
 
-```bash
-cd server
-npm run seed
-```
+Never put server secrets in client variables: Vite exposes `VITE_*` values in the browser bundle. Local `.env` files are ignored by Git. The publishable Clerk key is designed to be public; the Clerk secret key, database credentials, Cloudinary API secret, and Gmail app password are not.
 
-Creates: 6 categories, 1 admin, 1 demo buyer, 3 sample products.
+### Admin access
 
-To wipe and re-seed: `npm run seed:fresh`
+Sign in through Clerk, then assign the user `{"role":"admin"}` in that Clerk application's **public metadata**. On an authenticated API request, the server synchronizes the Clerk user and role to MongoDB. Use the same Clerk application and environment for the frontend and backend.
 
-### 6. Set admin role in Clerk
+The server also provides seed scripts (`npm run seed`, `npm run seed:fresh`, and `npm run seed:admin`). Set the required credentials in `server/.env` before running them; the scripts do not provide password defaults. The full seed requires `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SEED_BUYER_EMAIL`, and `SEED_BUYER_PASSWORD`. `seed:admin` also requires `ADMIN_NAME`. Review `server/seed.ts` and `server/scripts/seedAdmin.ts` before use. `seed:fresh` clears data; only run it against a database you intend to reset. The migration scripts are one-time administrative tools and require their own environment values.
 
-After seeding, go to your **Clerk Dashboard → Users → [admin user] → Edit → Public Metadata** and set:
+## API
 
-```json
-{ "role": "admin" }
-```
+All application API routes are prefixed by `/api/v1`.
 
-### 7. Run
+| Resource | Route prefix | Purpose |
+| --- | --- | --- |
+| Authentication sync | `/auth` | Get the signed-in user's MongoDB profile |
+| Categories | `/categories` | Read and administer categories |
+| Vendors | `/vendors` | Read and administer vendor records |
+| Products | `/products` | Browse and administer products |
+| Cart | `/cart` | Manage the signed-in buyer's cart |
+| Orders | `/orders` | Place orders, view orders, update status, retrieve invoices |
+| Contact | `/contact` | Submit and administer contact messages |
+| Admin | `/admin` | Buyer management and dashboard statistics |
 
-```bash
-# Terminal 1 — Backend
-cd server && npm run dev
+## Validation
 
-# Terminal 2 — Frontend
-cd client && npm run dev
-```
-
-- Frontend: http://localhost:5173
-- API: http://localhost:5000/api/v1
-
----
-
-## Roles
-
-| Role      | Capabilities                                                                 |
-| --------- | ---------------------------------------------------------------------------- |
-| **Buyer** | Browse products, manage cart, place orders, view invoices                    |
-| **Admin** | Manage products, categories, vendors, orders, users, messages; view stats    |
-
-Admin accounts are created via Clerk Dashboard (set `publicMetadata.role = "admin"`).
-
----
-
-## API Overview
-
-All routes prefixed with `/api/v1`.
-
-| Resource   | Key Endpoints                                                                                     |
-| ---------- | ------------------------------------------------------------------------------------------------- |
-| Auth       | `GET /auth/me`                                                                                    |
-| Categories | `GET /categories`, `POST /categories`, `DELETE /categories/:id`                                   |
-| Vendors    | `GET /vendors`, `GET /vendors/all`, `POST /vendors`, `PUT /vendors/:id`, `DELETE /vendors/:id`    |
-| Products   | `GET /products`, `GET /products/:id`, `POST /products`, `PUT /products/:id`, `DELETE /products/:id` |
-| Cart       | `GET /cart`, `POST /cart/add`, `PATCH /cart/item/:id`, `DELETE /cart/item/:id`, `DELETE /cart/clear` |
-| Orders     | `POST /orders`, `GET /orders/my`, `GET /orders`, `PATCH /orders/:id/status`, `GET /orders/:id/invoice` |
-| Contact    | `POST /contact`, `GET /contact`, `PATCH /contact/:id/read`                                        |
-| Admin      | `GET /admin/users`, `PATCH /admin/users/:id/status`, `GET /admin/stats`                           |
-
----
-
-## Infrastructure
-
-| Feature          | Implementation                                                                 |
-| ---------------- | ------------------------------------------------------------------------------ |
-| Rate Limiting    | `express-rate-limit` — auth: 10/15min, orders: 5/min, uploads: 20/10min, global: 200/min |
-| DB Indexing      | Mongoose indexes on all query-heavy fields (categories, vendor, buyer+createdAt, isActive/isDeleted) |
-| Caching          | Upstash Redis — categories (1hr), vendors (10min), products (2min), single product (5min) |
-| Message Queue    | BullMQ — all emails queued with 3 retries + exponential backoff                |
-| Load Balancing   | Nginx `upstream` block (see `nginx.conf`) — `least_conn` strategy              |
-| Reverse Proxy    | Nginx — SSL termination, static file serving, WebSocket proxying               |
-| CAP Theorem      | MongoDB Atlas = CP (Consistency + Partition Tolerance) — correct for B2B order data |
-
----
-
-## Email Notifications
-
-Buyers receive emails for:
-- Order placed (pending)
-- Order confirmed
-- Order completed
-- Order cancelled
-
-Emails are sent via BullMQ queue (non-blocking, retries on failure).
-
----
-
-## Deployment on Render
-
-### Backend (Web Service)
-
-| Setting       | Value                  |
-| ------------- | ---------------------- |
-| Root Dir      | `server`               |
-| Build Command | `npm install && npm run build` |
-| Start Command | `npm start`            |
-| Node Version  | 20                     |
-
-Add all `server/.env` variables in Render's **Environment** tab.
-
-### Frontend (Static Site)
-
-| Setting       | Value           |
-| ------------- | --------------- |
-| Root Dir      | `client`        |
-| Build Command | `npm install && npm run build` |
-| Publish Dir   | `dist`          |
-
-Add `VITE_API_URL` and `VITE_CLERK_PUBLISHABLE_KEY` in Render's environment.
-
----
-
-## VPS Deployment (with Nginx)
-
-See `nginx.conf` at the project root. It handles:
-- HTTP → HTTPS redirect
-- SSL termination (use Certbot)
-- Static file serving for the React build
-- API proxying to Node.js
-- WebSocket (Socket.io) proxying
-- Load balancing across multiple Node instances
-
-```bash
-# Install Nginx
-sudo apt install nginx
-
-# Copy config
-sudo cp nginx.conf /etc/nginx/sites-available/markethub
-sudo ln -s /etc/nginx/sites-available/markethub /etc/nginx/sites-enabled/
-
-# Get SSL cert
-sudo certbot --nginx -d yourdomain.com
-
-# Reload
-sudo nginx -t && sudo systemctl reload nginx
-```
-
----
-
-## Environment Variables Reference
-
-### Server
-
-| Variable                  | Description                              |
-| ------------------------- | ---------------------------------------- |
-| `PORT`                    | Server port (default: 5000)              |
-| `NODE_ENV`                | `development` or `production`            |
-| `MONGO_URI`               | MongoDB Atlas connection string          |
-| `CLIENT_URL`              | Frontend URL for CORS                    |
-| `CLERK_PUBLISHABLE_KEY`   | Clerk publishable key                    |
-| `CLERK_SECRET_KEY`        | Clerk secret key                         |
-| `CLOUDINARY_CLOUD_NAME`   | Cloudinary cloud name                    |
-| `CLOUDINARY_API_KEY`      | Cloudinary API key                       |
-| `CLOUDINARY_API_SECRET`   | Cloudinary API secret                    |
-| `GMAIL_USER`              | Gmail address for sending emails         |
-| `GMAIL_APP_PASSWORD`      | Gmail App Password (16 chars)            |
-| `GMAIL_FROM_NAME`         | Sender display name                      |
-| `UPSTASH_REDIS_REST_URL`  | Upstash Redis REST URL                   |
-| `UPSTASH_REDIS_REST_TOKEN`| Upstash Redis REST token                 |
-| `ADMIN_EMAIL`             | Admin email for seed script              |
-| `ADMIN_PASSWORD`          | Admin password for seed script           |
-| `ADMIN_NAME`              | Admin display name for seed script       |
-| `SENTRY_DSN`              | Sentry DSN (optional)                    |
-
-### Client
-
-| Variable                      | Description                    |
-| ----------------------------- | ------------------------------ |
-| `VITE_API_URL`                | Backend API base URL           |
-| `VITE_CLERK_PUBLISHABLE_KEY`  | Clerk publishable key          |
+The frontend defines `npm run lint` and `npm run build`. The backend defines `npm run build`. There is no implemented automated test suite; the backend `npm test` script is a placeholder that exits with an error.
