@@ -8,6 +8,10 @@ const logger_1 = __importDefault(require("../utils/logger"));
 const connectDB = async () => {
     try {
         const conn = await mongoose_1.default.connect(process.env.MONGO_URI);
+        const hello = await conn.connection.db.admin().command({ hello: 1 });
+        if (!hello.setName && hello.msg !== "isdbgrid") {
+            throw new Error("Checkout requires a MongoDB replica set or supported sharded deployment; standalone MongoDB is unsupported");
+        }
         logger_1.default.info(`MongoDB connected: ${conn.connection.host}`);
     }
     catch (err) {

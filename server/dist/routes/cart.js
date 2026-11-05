@@ -5,7 +5,7 @@ const cart_1 = require("../controllers/cart");
 const auth_1 = require("../middleware/auth");
 const restrictTo_1 = require("../middleware/restrictTo");
 const router = (0, express_1.Router)();
-router.use(auth_1.requireAuth, auth_1.protect, (0, restrictTo_1.restrictTo)("buyer"));
+router.use(auth_1.protect, (0, restrictTo_1.restrictTo)("buyer"));
 router.get("/", cart_1.getCart);
 router.post("/add", cart_1.addItem);
 router.patch("/item/:productId", cart_1.updateItem);

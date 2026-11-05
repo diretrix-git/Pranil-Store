@@ -21,7 +21,7 @@ const cartSchema = new Schema<ICart>(
     isDeleted: { type: Boolean, default: false },
     deletedAt: { type: Date, default: null },
   },
-  { timestamps: true },
+  { timestamps: true, optimisticConcurrency: true },
 );
 
 cartSchema.pre("save", function () {

@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
-import Cart from "../models/Cart";
 import Order from "../models/Order";
-import Product from "../models/Product";
+import { checkoutCart, transitionOrder } from "../services/orderTransactions";
+import { invalidateProductCache } from "../config/redis";
 import AppError from "../utils/AppError";
 import logger from "../utils/logger";
 import { queueEmail } from "../queues/emailQueue";
@@ -12,51 +12,9 @@ const NOTIFIABLE_STATUSES = new Set(["pending", "confirmed", "completed", "cance
 export const placeOrder = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const user = (req as any).user;
-    const cart = await Cart.findOne({ buyer: user._id }).populate("items.product");
-    if (!cart || cart.items.length === 0) return next(new AppError("Your cart is empty.", 400));
-
-    const stockErrors: string[] = [];
-    for (const item of cart.items) {
-      const prod = item.product as any;
-      if (!prod || prod.stock < item.quantity) {
-        stockErrors.push(`${item.name} (available: ${prod?.stock ?? 0})`);
-      }
-    }
-    if (stockErrors.length > 0) return next(new AppError(`Insufficient stock for: ${stockErrors.join(", ")}`, 409));
-
-    const items = cart.items.map((item) => {
-      const prod = item.product as any;
-      return { product: prod._id, name: item.name, price: item.price, quantity: item.quantity, unit: item.unit, subtotal: item.price * item.quantity };
-    });
-
-    const subtotal = items.reduce((sum, i) => sum + i.subtotal, 0);
-
-    const order = await Order.create({
-      buyer: user._id,
-      buyerSnapshot: { name: user.name, phone: user.phone, email: user.email, address: user.address },
-      items,
-      subtotal,
-      taxAmount: 0,
-      discountAmount: 0,
-      totalAmount: subtotal,
-      notes: req.body.notes || "",
-    });
-
-    // Deduct stock atomically — prevents overselling race condition
-    for (const item of cart.items) {
-      const updated = await Product.findOneAndUpdate(
-        { _id: (item.product as any)._id, stock: { $gte: item.quantity } },
-        { $inc: { stock: -item.quantity } },
-        { new: true },
-      );
-      if (!updated) {
-        // Rollback already-deducted items
-        return next(new AppError(`${item.name} went out of stock. Please refresh your cart.`, 409));
-      }
-    }
-
-    cart.items = [];
-    await cart.save();
+    const order = await checkoutCart(user, req.body.notes ?? "", req.body.cartVersion);
+    // External side effects must not run in a retryable transaction callback.
+    await invalidateProductCache();
 
     const io = (req.app as any).get("io");
     if (io) {
@@ -88,20 +46,10 @@ export const getBuyerOrders = async (req: Request, res: Response, next: NextFunc
 
 export const updateOrderStatus = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const order = await Order.findOne({ _id: req.params.orderId, isDeleted: false });
-    if (!order) return next(new AppError("Order not found.", 404));
-
-    const previousStatus = order.status;
     const newStatus = req.body.status as string;
-
-    order.status = newStatus as any;
-    await order.save();
-
-    // Restore stock when order is cancelled (only if it wasn't already cancelled)
-    if (newStatus === "cancelled" && previousStatus !== "cancelled") {
-      for (const item of order.items) {
-        await Product.findByIdAndUpdate(item.product, { $inc: { stock: item.quantity } });
-      }
+    const { order, previousStatus } = await transitionOrder(req.params.orderId as string, newStatus);
+    if (newStatus === "cancelled") {
+      await invalidateProductCache();
       logger.info(`Stock restored for cancelled order ${order.orderNumber}`);
     }
 

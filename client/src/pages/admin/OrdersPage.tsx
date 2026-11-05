@@ -3,8 +3,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../api/axiosInstance';
 import { formatRs } from '../../utils/formatCurrency';
+import { toast } from 'sonner';
 
 const STATUS_OPTIONS = ['pending', 'confirmed', 'processing', 'completed', 'cancelled'];
+const STATUS_TRANSITIONS: Record<string, string[]> = {
+  pending: ['confirmed', 'cancelled'], confirmed: ['processing', 'cancelled'],
+  processing: ['completed', 'cancelled'], completed: [], cancelled: [],
+};
 const STATUS_STYLES = {
   pending:    'bg-amber-100 text-amber-700',
   confirmed:  'bg-blue-100 text-blue-700',
@@ -45,8 +50,9 @@ export default function AdminOrdersPage() {
   });
 
   const updateStatus = useMutation({
-    mutationFn: ({ orderId, status }) => api.patch(`/orders/${orderId}/status`, { status }),
-    onSuccess: () => { queryClient.invalidateQueries(['admin-orders']); setStatusModal(null); },
+    mutationFn: ({ orderId, status }: { orderId: string; status: string }) => api.patch(`/orders/${orderId}/status`, { status }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['admin-orders'] }); setStatusModal(null); },
+    onError: (error: any) => { queryClient.invalidateQueries({ queryKey: ['admin-orders'] }); toast.error(error.response?.data?.message ?? 'Could not update order status.'); },
   });
 
   const allOrders = Array.isArray(data) ? data : [];
@@ -160,7 +166,7 @@ export default function AdminOrdersPage() {
               className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
               <h2 className="text-lg font-black text-slate-900 mb-4">Update Order Status</h2>
               <div className="space-y-2 mb-6">
-                {STATUS_OPTIONS.map((s) => (
+                {[statusModal.current, ...(STATUS_TRANSITIONS[statusModal.current] ?? [])].map((s) => (
                   <button key={s} onClick={() => setNewStatus(s)}
                     className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${newStatus === s ? 'border-violet-500 bg-violet-50 text-violet-700' : 'border-slate-200 text-slate-600 hover:border-violet-300'}`}>
                     {s.charAt(0).toUpperCase() + s.slice(1)}

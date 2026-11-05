@@ -37,6 +37,11 @@ const addItem = async (req, res, next) => {
     try {
         const { productId, quantity = 1 } = req.body;
         const userId = req.user._id;
+        // Validate quantity — must be a positive integer, capped at 500
+        const qty = Number(quantity);
+        if (!Number.isInteger(qty) || qty < 1 || qty > 500) {
+            return next(new AppError_1.default("Quantity must be a whole number between 1 and 500.", 400));
+        }
         const product = await Product_1.default.findOne({ _id: productId, isActive: true, isDeleted: false });
         if (!product)
             return next(new AppError_1.default("Product not found.", 404));
@@ -45,7 +50,7 @@ const addItem = async (req, res, next) => {
             cart = await Cart_1.default.create({ buyer: userId, items: [] });
         const existingIndex = cart.items.findIndex((i) => i.product && i.product.toString() === productId.toString());
         if (existingIndex >= 0) {
-            cart.items[existingIndex].quantity += quantity;
+            cart.items[existingIndex].quantity += qty;
         }
         else {
             cart.items.push({
@@ -68,17 +73,22 @@ exports.addItem = addItem;
 const updateItem = async (req, res, next) => {
     try {
         const { quantity } = req.body;
+        // Validate quantity — 0 means remove, max 500
+        const qty = Number(quantity);
+        if (!Number.isInteger(qty) || qty < 0 || qty > 500) {
+            return next(new AppError_1.default("Quantity must be a whole number between 0 and 500.", 400));
+        }
         const cart = await Cart_1.default.findOne({ buyer: req.user._id });
         if (!cart)
             return next(new AppError_1.default("Cart not found.", 404));
         const itemIndex = cart.items.findIndex((i) => i.product.toString() === req.params.productId.toString());
         if (itemIndex === -1)
             return next(new AppError_1.default("Item not found in cart.", 404));
-        if (quantity <= 0) {
+        if (qty <= 0) {
             cart.items.splice(itemIndex, 1);
         }
         else {
-            cart.items[itemIndex].quantity = quantity;
+            cart.items[itemIndex].quantity = qty;
         }
         await cart.save();
         res.status(200).json({ status: "success", data: { cart }, message: "Cart updated" });

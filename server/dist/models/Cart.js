@@ -48,7 +48,7 @@ const cartSchema = new mongoose_1.Schema({
     totalAmount: { type: Number, default: 0 },
     isDeleted: { type: Boolean, default: false },
     deletedAt: { type: Date, default: null },
-}, { timestamps: true });
+}, { timestamps: true, optimisticConcurrency: true });
 cartSchema.pre("save", function () {
     this.totalAmount = this.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
 });

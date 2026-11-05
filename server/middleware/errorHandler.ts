@@ -16,6 +16,11 @@ const errorHandler = (err: any, req: Request, res: Response, _next: NextFunction
     return;
   }
 
+  if (err.name === "VersionError") {
+    res.status(409).json({ status: "error", message: "Your cart changed. Please refresh and try again.", errors: [] });
+    return;
+  }
+
   if (err.name === "ValidationError") {
     const errors = Object.values(err.errors).map((e: any) => ({ field: e.path, message: e.message }));
     res.status(422).json({ status: "error", message: "Validation failed", errors });

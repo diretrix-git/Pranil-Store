@@ -12,9 +12,11 @@ export default function CartPage() {
   const [priceWarning, setPriceWarning] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
   const [notes, setNotes] = useState("");
+  const [checkoutVersion, setCheckoutVersion] = useState<number | undefined>();
+  const [preparingCheckout, setPreparingCheckout] = useState(false);
   const [localQty, setLocalQty] = useState<Record<string, number | string>>({});
 
-  const { data: cartData, isLoading } = useQuery({
+  const { data: cartData, isLoading, refetch: refreshCart } = useQuery({
     queryKey: ["cart"],
     queryFn: async () => {
       const res = await api.get("/cart");
@@ -40,10 +42,11 @@ export default function CartPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["cart"] }),
   });
   const placeOrder = useMutation({
-    mutationFn: () => api.post("/orders", { notes }),
+    mutationFn: () => api.post("/orders", { notes, cartVersion: checkoutVersion }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cart"] });
       setShowCheckout(false);
+      setLocalQty({});
       setNotes("");
       toast.success("Order placed! 🎉", {
         description: "Check My Orders to view details and your invoice.",
@@ -53,6 +56,8 @@ export default function CartPage() {
     },
     onError: (err: any) => {
       setShowCheckout(false);
+      setLocalQty({});
+      queryClient.invalidateQueries({ queryKey: ["cart"] });
       toast.error("Order failed", {
         description: err.response?.data?.message ?? "Failed to place order. Please try again.",
       });
@@ -79,25 +84,32 @@ export default function CartPage() {
   }, [updateQty]);
 
   const flushAndCheckout = useCallback(async () => {
-    // Show modal immediately — don't wait for server round trips
-    setShowCheckout(true);
-
-    // Fire qty updates in background (non-blocking)
-    const pending = Object.entries(debounceRef.current);
-    pending.forEach(([, timer]) => clearTimeout(timer));
+    // Confirm only after quantity edits and current prices have reached the server.
+    setPreparingCheckout(true);
+    Object.values(debounceRef.current).forEach(clearTimeout);
     debounceRef.current = {};
-
-    const dirtyPids = Object.keys(localQty);
-    if (dirtyPids.length > 0) {
-      Promise.all(
-        dirtyPids.map((pid) => {
-          const qty = Number(localQty[pid]);
-          if (qty >= 1) return api.patch(`/cart/item/${pid}`, { quantity: qty }).catch(() => null);
-          return Promise.resolve();
-        })
-      ).then(() => queryClient.invalidateQueries({ queryKey: ["cart"] }));
+    try {
+      // Serialize edits: optimistic cart versions reject concurrent stale saves.
+      for (const [pid, value] of Object.entries(localQty)) {
+        const quantity = Number(value);
+        if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 500) {
+          throw new Error("Review item quantities before checkout.");
+        }
+        await api.patch(`/cart/item/${pid}`, { quantity });
+      }
+      const refreshed = await refreshCart();
+      if (refreshed.isError) throw new Error("Could not refresh your cart. Please try again.");
+      setLocalQty({});
+      setCheckoutVersion((refreshed.data as any)?.__v);
+      setShowCheckout(true);
+    } catch (err: any) {
+      setLocalQty({});
+      queryClient.invalidateQueries({ queryKey: ["cart"] });
+      toast.error("Could not prepare checkout", { description: err.response?.data?.message ?? err.message });
+    } finally {
+      setPreparingCheckout(false);
     }
-  }, [localQty, queryClient]);
+  }, [localQty, queryClient, refreshCart]);
   const items: any[] = (cartData as any)?.items ?? [];
   // Compute total from localQty so it stays in sync with what the user typed
   const total: number = items.length > 0
@@ -158,10 +170,10 @@ export default function CartPage() {
                           <td className="px-4 py-4 font-medium text-slate-800">{item.name ?? "Product"}</td>
                           <td className="px-4 py-4 text-slate-600">{formatRs(item.price)}</td>
                           <td className="px-4 py-4">
-                            <input type="number" min={1} value={qty} onChange={(e) => handleQtyChange(pid, e.target.value)} onBlur={(e) => commitQty(pid, e.target.value)} onKeyDown={(e) => e.key === "Enter" && commitQty(pid, qty)} className="w-20 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-center text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 focus:bg-white transition-all" />
+                            <input disabled={preparingCheckout || showCheckout} type="number" min={1} value={qty} onChange={(e) => handleQtyChange(pid, e.target.value)} onBlur={(e) => commitQty(pid, e.target.value)} onKeyDown={(e) => e.key === "Enter" && commitQty(pid, qty)} className="w-20 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-center text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 focus:bg-white transition-all" />
                           </td>
                           <td className="px-4 py-4 font-semibold text-slate-900">{formatRs(Number(item.price) * Number(qty))}</td>
-                          <td className="px-4 py-4"><button onClick={() => removeItem.mutate(pid)} className="text-red-500 hover:text-red-700 text-xs font-medium transition-colors">Remove</button></td>
+                          <td className="px-4 py-4"><button disabled={preparingCheckout || showCheckout} onClick={() => removeItem.mutate(pid)} className="text-red-500 hover:text-red-700 text-xs font-medium transition-colors">Remove</button></td>
                         </motion.tr>
                       );
                     })}
@@ -170,10 +182,10 @@ export default function CartPage() {
               </table>
             </div>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <motion.button whileTap={{ scale: 0.97 }} onClick={() => clearCartMutation.mutate()} className="text-sm text-slate-500 hover:text-red-500 border border-slate-200 hover:border-red-200 px-4 py-2 rounded-xl transition-all">Clear Cart</motion.button>
+              <motion.button whileTap={{ scale: 0.97 }} onClick={() => clearCartMutation.mutate()} disabled={preparingCheckout || showCheckout} className="text-sm text-slate-500 hover:text-red-500 border border-slate-200 hover:border-red-200 px-4 py-2 rounded-xl transition-all">Clear Cart</motion.button>
               <div className="text-right w-full sm:w-auto">
                 <p className="text-xl sm:text-2xl font-black text-slate-900 mb-3">Total: <span className="text-violet-600">{formatRs(total)}</span></p>
-                <motion.button whileTap={{ scale: 0.97 }} onClick={flushAndCheckout} className="w-full sm:w-auto px-8 py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:opacity-90 transition-opacity shadow-md shadow-violet-200">Checkout →</motion.button>
+                <motion.button whileTap={{ scale: 0.97 }} onClick={flushAndCheckout} disabled={preparingCheckout || updateQty.isPending} className="w-full sm:w-auto px-8 py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:opacity-90 transition-opacity shadow-md shadow-violet-200">{preparingCheckout ? "Refreshing cart…" : "Checkout →"}</motion.button>
               </div>
             </div>
           </motion.div>

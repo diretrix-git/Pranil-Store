@@ -4,9 +4,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getAllOrders = exports.getInvoice = exports.updateOrderStatus = exports.getBuyerOrders = exports.placeOrder = void 0;
-const Cart_1 = __importDefault(require("../models/Cart"));
 const Order_1 = __importDefault(require("../models/Order"));
-const Product_1 = __importDefault(require("../models/Product"));
+const orderTransactions_1 = require("../services/orderTransactions");
+const redis_1 = require("../config/redis");
 const AppError_1 = __importDefault(require("../utils/AppError"));
 const logger_1 = __importDefault(require("../utils/logger"));
 const emailQueue_1 = require("../queues/emailQueue");
@@ -15,43 +15,9 @@ const NOTIFIABLE_STATUSES = new Set(["pending", "confirmed", "completed", "cance
 const placeOrder = async (req, res, next) => {
     try {
         const user = req.user;
-        const cart = await Cart_1.default.findOne({ buyer: user._id }).populate("items.product");
-        if (!cart || cart.items.length === 0)
-            return next(new AppError_1.default("Your cart is empty.", 400));
-        const stockErrors = [];
-        for (const item of cart.items) {
-            const prod = item.product;
-            if (!prod || prod.stock < item.quantity) {
-                stockErrors.push(`${item.name} (available: ${prod?.stock ?? 0})`);
-            }
-        }
-        if (stockErrors.length > 0)
-            return next(new AppError_1.default(`Insufficient stock for: ${stockErrors.join(", ")}`, 409));
-        const items = cart.items.map((item) => {
-            const prod = item.product;
-            return { product: prod._id, name: item.name, price: item.price, quantity: item.quantity, unit: item.unit, subtotal: item.price * item.quantity };
-        });
-        const subtotal = items.reduce((sum, i) => sum + i.subtotal, 0);
-        const order = await Order_1.default.create({
-            buyer: user._id,
-            buyerSnapshot: { name: user.name, phone: user.phone, email: user.email, address: user.address },
-            items,
-            subtotal,
-            taxAmount: 0,
-            discountAmount: 0,
-            totalAmount: subtotal,
-            notes: req.body.notes || "",
-        });
-        // Deduct stock atomically — prevents overselling race condition
-        for (const item of cart.items) {
-            const updated = await Product_1.default.findOneAndUpdate({ _id: item.product._id, stock: { $gte: item.quantity } }, { $inc: { stock: -item.quantity } }, { new: true });
-            if (!updated) {
-                // Rollback already-deducted items
-                return next(new AppError_1.default(`${item.name} went out of stock. Please refresh your cart.`, 409));
-            }
-        }
-        cart.items = [];
-        await cart.save();
+        const order = await (0, orderTransactions_1.checkoutCart)(user, req.body.notes ?? "", req.body.cartVersion);
+        // External side effects must not run in a retryable transaction callback.
+        await (0, redis_1.invalidateProductCache)();
         const io = req.app.get("io");
         if (io) {
             io.to("admin_room").emit("new_order", {
@@ -86,18 +52,10 @@ const getBuyerOrders = async (req, res, next) => {
 exports.getBuyerOrders = getBuyerOrders;
 const updateOrderStatus = async (req, res, next) => {
     try {
-        const order = await Order_1.default.findOne({ _id: req.params.orderId, isDeleted: false });
-        if (!order)
-            return next(new AppError_1.default("Order not found.", 404));
-        const previousStatus = order.status;
         const newStatus = req.body.status;
-        order.status = newStatus;
-        await order.save();
-        // Restore stock when order is cancelled (only if it wasn't already cancelled)
-        if (newStatus === "cancelled" && previousStatus !== "cancelled") {
-            for (const item of order.items) {
-                await Product_1.default.findByIdAndUpdate(item.product, { $inc: { stock: item.quantity } });
-            }
+        const { order, previousStatus } = await (0, orderTransactions_1.transitionOrder)(req.params.orderId, newStatus);
+        if (newStatus === "cancelled") {
+            await (0, redis_1.invalidateProductCache)();
             logger_1.default.info(`Stock restored for cancelled order ${order.orderNumber}`);
         }
         // Send buyer status email — fire-and-forget
