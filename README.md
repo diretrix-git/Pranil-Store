@@ -7,7 +7,7 @@ Pranil Store is a B2B marketplace where buyers browse products from multiple ven
 - Buyer and admin roles. Buyers sign in through Clerk components; an admin role is assigned through Clerk public metadata and synchronized to MongoDB.
 - Product catalog with search and category, vendor, and price filters.
 - Admin management for products, categories, vendors, buyer accounts, orders, and contact messages.
-- Persistent carts, stock checks and deduction during checkout, order status management, and print-ready invoices.
+- Persistent carts, per-product conditional stock deductions during checkout, admin status updates, and print-ready invoices. Checkout is not atomic across the order and all cart items; see the integrity limits below.
 - Cloudinary image uploads for admin-managed product images.
 - Admin dashboard metrics and authenticated Socket.IO notifications for new orders and contact messages.
 - Optional Upstash Redis caching for catalog data.
@@ -117,6 +117,24 @@ All application API routes are prefixed by `/api/v1`.
 | Contact | `/contact` | Submit and administer contact messages |
 | Admin | `/admin` | Buyer management and dashboard statistics |
 
+## Order Integrity and Delivery Limits
+
+| Path | Implemented behavior | Static limitation |
+| --- | --- | --- |
+| Checkout | Create an order, then conditionally decrement each product where stock is sufficient, then clear the cart | Each product update is atomic; the whole checkout is not a transaction. A later item failure can leave the order and earlier deductions in place. The rollback comment has no rollback implementation. |
+| Pricing | Build order lines from the prices stored in the cart | Current products are populated for stock checks, but checkout does not refresh cart prices. A deliberate price-lock policy is not established. |
+| Admin status update | Accept any of pending, confirmed, processing, completed or cancelled; save the new status | No legal-transition graph or conditional prior-state write is enforced. Status is saved before stock restoration. |
+| Cancellation | Restore stock when changing from a non-cancelled status to cancelled | Moving a cancelled order to another status and cancelling again can restore stock again without a new deduction. Concurrent cancellation also has a read-before-write risk. |
+| Email | Invoke asynchronous SMTP sending, log failures | No BullMQ durable queue, persisted job, retry policy or delivery guarantee is implemented; the worker starter is a no-op. |
+
+These consequences follow from source review. They were not reproduced against a running application. Implementation details and pinned references are in [source-backed claims](docs/source-backed-claims.md).
+
+## Project Context and Disclosure
+
+Owner-supplied project context describes Pranil Store as individual client/freelance work. Source inspection does not independently verify authorship, client acceptance, commercial deployment, traffic or business outcomes. Use synthetic buyers and orders in demonstrations. Do not publish customer names, contact details, addresses, invoices, credentials or client-owned assets without authorization.
+
 ## Validation
 
 The frontend defines `npm run lint` and `npm run build`. The backend defines `npm run build`. There is no implemented automated test suite; the backend `npm test` script is a placeholder that exits with an error.
+
+Fresh installation, build, lint, runtime, external-service and deployment checks were **NOT RUN** for this documentation update. Source inspection establishes implemented code paths, not successful service delivery.
