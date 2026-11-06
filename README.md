@@ -121,4 +121,6 @@ All application API routes are prefixed by `/api/v1`.
 
 Run `cd server && npm ci --ignore-scripts && npm test` for the order integration and client checkout-helper regression suite. The harness creates and removes its own loopback-only MongoDB 7.0.24 replica set with synthetic data; first use downloads a MongoDB binary. It does not read application environment files or accept a database URI. No Clerk, SMTP or Redis credentials are needed. Node.js 20+ and a supported MongoDB binary platform are required.
 
+Run `cd client && npm ci --ignore-scripts && npm test` for the React cart/query integration tests. They use JSDOM, the installed QueryClient and Axios with synthetic deferred HTTP responses; no live service credentials are needed.
+
 The backend defines `npm run typecheck` and `npm run build`. The frontend defines `npm run lint` and `npm run build`; use `npx tsc --noEmit` for its separate typecheck. See [Phase 3 verification results](docs/phase3-verification.md) for actual checks, existing client type errors and lint coverage limits. The integrity tests do not establish deployment or external-service success.

@@ -77,6 +77,11 @@ async function invoke(controller, user, body = {}, params = {}) {
 const checkout = user => invoke(placeOrder, user);
 const changeStatus = (id, status) => invoke(updateOrderStatus, buyer(), { status }, { orderId: String(id) });
 const stock = async p => (await Product.findById(p._id)).stock;
+async function transactionStocks(products, session) {
+  const stocks = [];
+  for (const p of products) stocks.push((await Product.findById(p._id).session(session)).stock);
+  return stocks;
+}
 function conflict(result) { assert.equal(result.error?.statusCode, 409, result.error?.stack); }
 async function placed(products, quantity = 1) {
   const user = buyer(); await cart(user, products, quantity);
@@ -128,6 +133,111 @@ test('database failure on second deduction rolls back order, earlier stock and c
   assert.equal(effects.emails.length, 0); assert.equal(effects.sockets.length, 0); assert.equal(effects.cache, 0);
 });
 
+test('final cart write rejection rolls back every deduction and the inserted order', async () => {
+  const products = [await product(5), await product(7)];
+  const user = buyer(); const originalCart = await cart(user, products, 2);
+  const originalSave = Cart.prototype.save;
+  let staged;
+  await mongoose.connection.db.command({ collMod: Cart.collection.collectionName,
+    validator: { $expr: { $gt: [{ $size: '$items' }, 0] } },
+    validationLevel: 'strict', validationAction: 'error' });
+  Cart.prototype.save = async function (options) {
+    if (options?.session && this._id.equals(originalCart._id)) {
+      staged = {
+        orders: await Order.countDocuments({ buyer: user._id }).session(options.session),
+        stocks: await transactionStocks(products, options.session),
+      };
+    }
+    return originalSave.call(this, options);
+  };
+  let result;
+  try { result = await checkout(user); }
+  finally {
+    Cart.prototype.save = originalSave;
+    await mongoose.connection.db.command({ collMod: Cart.collection.collectionName, validator: {} });
+  }
+  assert.deepEqual(staged, { orders: 1, stocks: [3, 5] });
+  assert.equal(result.error?.code, 121, result.error?.stack);
+  assert.equal(await Order.countDocuments(), 0);
+  assert.deepEqual(await Promise.all(products.map(stock)), [5, 7]);
+  assert.deepEqual((await Cart.findById(originalCart._id)).toObject(), originalCart.toObject());
+  assert.equal(effects.emails.length, 0); assert.equal(effects.sockets.length, 0); assert.equal(effects.cache, 0);
+});
+
+test('order insert rejection rolls back every deduction and preserves the cart', async () => {
+  const products = [await product(5), await product(7)];
+  const user = buyer(); const originalCart = await cart(user, products, 2);
+  const originalCreate = Order.create;
+  let stagedStocks;
+  await mongoose.connection.db.command({ collMod: Order.collection.collectionName,
+    validator: { notes: { $ne: 'REJECT_SYNTHETIC_ORDER' } },
+    validationLevel: 'strict', validationAction: 'error' });
+  Order.create = async function (documents, options) {
+    if (options?.session && documents[0]?.notes === 'REJECT_SYNTHETIC_ORDER') {
+      stagedStocks = await transactionStocks(products, options.session);
+    }
+    return originalCreate.call(this, documents, options);
+  };
+  let result;
+  try { result = await invoke(placeOrder, user, { notes: 'REJECT_SYNTHETIC_ORDER' }); }
+  finally {
+    Order.create = originalCreate;
+    await mongoose.connection.db.command({ collMod: Order.collection.collectionName, validator: {} });
+  }
+  assert.deepEqual(stagedStocks, [3, 5]);
+  assert.equal(result.error?.code, 121, result.error?.stack);
+  assert.equal(await Order.countDocuments(), 0);
+  assert.deepEqual(await Promise.all(products.map(stock)), [5, 7]);
+  assert.deepEqual((await Cart.findById(originalCart._id)).toObject(), originalCart.toObject());
+  assert.equal(effects.emails.length, 0); assert.equal(effects.sockets.length, 0); assert.equal(effects.cache, 0);
+});
+
+test('transient failure after the cart save retries checkout and delivers only the committed order once', async () => {
+  const products = [await product(7), await product(9)];
+  const user = buyer(); const originalCart = await cart(user, products, 2);
+  const originalSave = Cart.prototype.save;
+  const attempts = [];
+  Cart.prototype.save = async function (options) {
+    const saved = await originalSave.call(this, options);
+    if (options?.session && this._id.equals(originalCart._id)) {
+      const order = await Order.findOne({ buyer: user._id }).session(options.session);
+      attempts.push({ id: String(order._id),
+        stocks: await transactionStocks(products, options.session),
+        cartItems: (await Cart.findById(this._id).session(options.session)).items.length,
+        effects: [effects.emails.length, effects.sockets.length, effects.cache],
+      });
+      if (attempts.length === 1) {
+        const error = new mongoose.mongo.MongoServerError({ message: 'Synthetic retry after cart write', code: 112 });
+        error.addErrorLabel('TransientTransactionError');
+        throw error;
+      }
+    }
+    return saved;
+  };
+  let result;
+  try { result = await checkout(user); }
+  finally { Cart.prototype.save = originalSave; }
+  assert.equal(result.status, 201, result.error?.stack);
+  assert.equal(attempts.length, 2);
+  for (const attempt of attempts) {
+    assert.deepEqual(attempt.stocks, [5, 7]);
+    assert.equal(attempt.cartItems, 0);
+    assert.deepEqual(attempt.effects, [0, 0, 0]);
+  }
+  assert.notEqual(attempts[0].id, attempts[1].id);
+  assert.equal(String(result.payload.data.order._id), attempts[1].id);
+  assert.equal(await Order.countDocuments(), 1);
+  assert.equal(await Order.findById(attempts[0].id), null);
+  assert.equal(String((await Order.findOne({ buyer: user._id }))._id), attempts[1].id);
+  assert.deepEqual(await Promise.all(products.map(stock)), [5, 7]);
+  const cleared = await Cart.findById(originalCart._id);
+  assert.equal(cleared.items.length, 0); assert.equal(cleared.totalAmount, 0);
+  assert.equal(cleared.__v, originalCart.__v + 1);
+  assert.equal(effects.emails.length, 1); assert.equal(effects.sockets.length, 1); assert.equal(effects.cache, 1);
+  assert.equal(String(effects.emails[0].order._id), attempts[1].id);
+  assert.equal(String(effects.sockets[0].data.orderId), attempts[1].id);
+});
+
 test('concurrent buyers cannot oversell shared stock', async () => {
   const p = await product(3); const users = Array.from({ length: 8 }, buyer);
   await Promise.all(users.map(u => cart(u, [p])));
@@ -158,6 +268,67 @@ test('concurrent and repeated cancellation restores every line exactly once', as
   const saved = await Order.findById(order._id);
   assert.equal(saved.status, 'cancelled'); assert.equal(saved.inventoryState, 'restored');
   assert.equal(effects.emails.length, 1); assert.equal(effects.cache, 1);
+});
+
+test('cancellation racing completion commits only one terminal state and its effects', async t => {
+  for (const winner of ['cancelled', 'completed']) await t.test(`${winner} wins`, { timeout: 5000 }, async () => {
+    const products = [await product(), await product(8)]; const order = await placed(products, 2);
+    await Order.updateOne({ _id: order._id }, { $set: { status: 'processing' } });
+    effects.emails = []; effects.sockets = []; effects.cache = 0;
+    const loser = winner === 'cancelled' ? 'completed' : 'cancelled';
+    const originalFind = Order.findOne, originalSave = Order.prototype.save;
+    let reads = 0, releaseReads, releaseLoser;
+    const bothRead = new Promise(resolve => { releaseReads = resolve; });
+    const winnerCommitted = new Promise(resolve => { releaseLoser = resolve; });
+    Order.findOne = function (...args) {
+      const query = originalFind.apply(this, args), originalExec = query.exec;
+      query.exec = async function (...execArgs) {
+        const found = await originalExec.apply(this, execArgs);
+        if (found?._id.equals(order._id) && found.$session()) {
+          reads++;
+          if (reads <= 2) {
+            assert.equal(found.status, 'processing');
+            if (reads === 2) releaseReads();
+            await bothRead;
+          }
+        }
+        return found;
+      };
+      return query;
+    };
+    Order.prototype.save = async function (options) {
+      // Both transactions hold a processing snapshot. Force each terminal state
+      // to win once, then let MongoDB reject/retry the competing real write.
+      if (options?.session && this._id.equals(order._id) && this.status === loser) await winnerCommitted;
+      return originalSave.call(this, options);
+    };
+    let results, deadline;
+    const requests = [];
+    try {
+      const winningRequest = changeStatus(order._id, winner).finally(releaseLoser);
+      requests.push(winningRequest, changeStatus(order._id, loser));
+      results = await Promise.race([Promise.all(requests), new Promise((_, reject) => {
+        deadline = setTimeout(() => reject(new Error('Terminal race coordination timed out')), 3000);
+      })]);
+    } finally {
+      clearTimeout(deadline);
+      releaseReads(); releaseLoser();
+      Order.findOne = originalFind; Order.prototype.save = originalSave;
+      await Promise.allSettled(requests);
+    }
+    assert.equal(results[0].status, 200, results[0].error?.stack); conflict(results[1]);
+    assert.ok(reads >= 3, 'the competing transaction must reread the committed terminal state');
+    const saved = await Order.findById(order._id);
+    assert.equal(saved.status, winner);
+    assert.equal(saved.inventoryState, winner === 'cancelled' ? 'restored' : 'reserved');
+    assert.deepEqual(await Promise.all(products.map(stock)), winner === 'cancelled' ? [10, 8] : [8, 6]);
+    assert.equal(effects.emails.length, 1); assert.equal(effects.emails[0].newStatus, winner);
+    assert.equal(effects.sockets.length, 0); assert.equal(effects.cache, winner === 'cancelled' ? 1 : 0);
+    assert.equal((await changeStatus(order._id, winner)).status, 200);
+    conflict(await changeStatus(order._id, loser));
+    assert.deepEqual(await Promise.all(products.map(stock)), winner === 'cancelled' ? [10, 8] : [8, 6]);
+    assert.equal(effects.emails.length, 1); assert.equal(effects.cache, winner === 'cancelled' ? 1 : 0);
+  });
 });
 
 test('cancellation failure rolls back status and all restorations', async () => {

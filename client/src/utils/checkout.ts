@@ -5,7 +5,8 @@ interface CartLine {
   quantity: number;
   unit?: string;
 }
-interface ServerCart {
+export interface ServerCart {
+  _id?: string;
   __v: number;
   items: CartLine[];
   totalAmount: number;
