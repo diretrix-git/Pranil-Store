@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
@@ -6,45 +6,39 @@ import { toast } from "sonner";
 import Navbar from "../../components/Navbar";
 import api from "../../api/axiosInstance";
 import { formatRs } from "../../utils/formatCurrency";
+import { type CartConfirmation, type ServerCart } from "../../utils/checkout";
+import { useCartEditor } from "../../hooks/useCartEditor";
 
 export default function CartPage() {
   const queryClient = useQueryClient();
   const [priceWarning, setPriceWarning] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
+  const [confirmation, setConfirmation] = useState<CartConfirmation | null>(null);
   const [notes, setNotes] = useState("");
-  const [localQty, setLocalQty] = useState<Record<string, number | string>>({});
 
+  const fetchCart = useCallback(async (signal?: AbortSignal): Promise<ServerCart> => {
+    const res = await api.get("/cart", { signal });
+    const payload = res.data.data ?? res.data;
+    const cart = payload.cart ?? payload;
+    if (payload.priceChanged) setPriceWarning(true);
+    return cart;
+  }, []);
   const { data: cartData, isLoading } = useQuery({
     queryKey: ["cart"],
-    queryFn: async () => {
-      const res = await api.get("/cart");
-      const payload = res.data.data ?? res.data;
-      if (payload.priceChanged) setPriceWarning(true);
-      return payload.cart ?? payload;
+    queryFn: async ({ signal }) => {
+      const cart = await fetchCart(signal);
+      const cached = queryClient.getQueryData<ServerCart>(["cart"]);
+      return cached && cached._id === cart._id && cached.__v > cart.__v ? cached : cart;
     },
   });
 
-  const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-
-  const updateQty = useMutation({
-    mutationFn: ({ productId, quantity }: { productId: string; quantity: number }) => api.patch(`/cart/item/${productId}`, { quantity }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["cart"] }),
-    onError: () => queryClient.invalidateQueries({ queryKey: ["cart"] }),
-  });
-  const removeItem = useMutation({
-    mutationFn: (productId: string) => api.delete(`/cart/item/${productId}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["cart"] }),
-  });
-  const clearCartMutation = useMutation({
-    mutationFn: () => api.delete("/cart/clear"),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["cart"] }),
-  });
   const placeOrder = useMutation({
-    mutationFn: () => api.post("/orders", { notes }),
+    mutationFn: () => api.post("/orders", { notes, cartVersion: confirmation?.cartVersion }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cart"] });
       setShowCheckout(false);
       setNotes("");
+      editor.resetDrafts();
       toast.success("Order placed! 🎉", {
         description: "Check My Orders to view details and your invoice.",
         duration: 6000,
@@ -53,51 +47,24 @@ export default function CartPage() {
     },
     onError: (err: any) => {
       setShowCheckout(false);
+      queryClient.invalidateQueries({ queryKey: ["cart"] });
       toast.error("Order failed", {
         description: err.response?.data?.message ?? "Failed to place order. Please try again.",
       });
     },
   });
 
-  const handleQtyChange = useCallback((pid: string, val: string) => {
-    setLocalQty((prev) => ({ ...prev, [pid]: val }));
-    // Debounce the API call — fires 600ms after user stops typing
-    if (debounceRef.current[pid]) clearTimeout(debounceRef.current[pid]);
-    const qty = Number(val);
-    if (qty >= 1) {
-      debounceRef.current[pid] = setTimeout(() => {
-        updateQty.mutate({ productId: pid, quantity: qty });
-      }, 600);
-    }
-  }, [updateQty]);
-
-  const commitQty = useCallback((pid: string, val: string | number) => {
-    // On blur/Enter: cancel pending debounce and fire immediately
-    if (debounceRef.current[pid]) clearTimeout(debounceRef.current[pid]);
-    const qty = Number(val);
-    if (qty >= 1) updateQty.mutate({ productId: pid, quantity: qty });
-  }, [updateQty]);
-
-  const flushAndCheckout = useCallback(async () => {
-    // Show modal immediately — don't wait for server round trips
-    setShowCheckout(true);
-
-    // Fire qty updates in background (non-blocking)
-    const pending = Object.entries(debounceRef.current);
-    pending.forEach(([, timer]) => clearTimeout(timer));
-    debounceRef.current = {};
-
-    const dirtyPids = Object.keys(localQty);
-    if (dirtyPids.length > 0) {
-      Promise.all(
-        dirtyPids.map((pid) => {
-          const qty = Number(localQty[pid]);
-          if (qty >= 1) return api.patch(`/cart/item/${pid}`, { quantity: qty }).catch(() => null);
-          return Promise.resolve();
-        })
-      ).then(() => queryClient.invalidateQueries({ queryKey: ["cart"] }));
-    }
-  }, [localQty, queryClient]);
+  const reportError = useCallback((error: any) => {
+    toast.error(error?.response?.data?.message ?? error?.message ?? "Cart update failed. Please review and try again.");
+  }, []);
+  const editor = useCartEditor(queryClient, cartData, fetchCart, reportError, showCheckout || placeOrder.isPending);
+  const { localQty } = editor;
+  const flushAndCheckout = async () => {
+    try {
+      const snapshot = await editor.prepare();
+      if (snapshot) { setConfirmation(snapshot); setShowCheckout(true); }
+    } catch (error) { reportError(error); }
+  };
   const items: any[] = (cartData as any)?.items ?? [];
   // Compute total from localQty so it stays in sync with what the user typed
   const total: number = items.length > 0
@@ -158,10 +125,10 @@ export default function CartPage() {
                           <td className="px-4 py-4 font-medium text-slate-800">{item.name ?? "Product"}</td>
                           <td className="px-4 py-4 text-slate-600">{formatRs(item.price)}</td>
                           <td className="px-4 py-4">
-                            <input type="number" min={1} value={qty} onChange={(e) => handleQtyChange(pid, e.target.value)} onBlur={(e) => commitQty(pid, e.target.value)} onKeyDown={(e) => e.key === "Enter" && commitQty(pid, qty)} className="w-20 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-center text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 focus:bg-white transition-all" />
+                            <input type="number" min={1} value={qty} disabled={editor.isLocked} onChange={(e) => editor.changeQuantity(pid, e.target.value)} onBlur={() => editor.commitQuantity(pid)} onKeyDown={(e) => e.key === "Enter" && editor.commitQuantity(pid)} className="w-20 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-center text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 focus:bg-white transition-all" />
                           </td>
                           <td className="px-4 py-4 font-semibold text-slate-900">{formatRs(Number(item.price) * Number(qty))}</td>
-                          <td className="px-4 py-4"><button onClick={() => removeItem.mutate(pid)} className="text-red-500 hover:text-red-700 text-xs font-medium transition-colors">Remove</button></td>
+                          <td className="px-4 py-4"><button disabled={editor.isLocked} onClick={() => editor.deleteItems(pid)} className="text-red-500 hover:text-red-700 text-xs font-medium transition-colors">Remove</button></td>
                         </motion.tr>
                       );
                     })}
@@ -170,27 +137,25 @@ export default function CartPage() {
               </table>
             </div>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <motion.button whileTap={{ scale: 0.97 }} onClick={() => clearCartMutation.mutate()} className="text-sm text-slate-500 hover:text-red-500 border border-slate-200 hover:border-red-200 px-4 py-2 rounded-xl transition-all">Clear Cart</motion.button>
+              <motion.button whileTap={{ scale: 0.97 }} disabled={editor.isLocked} onClick={() => editor.deleteItems()} className="text-sm text-slate-500 hover:text-red-500 border border-slate-200 hover:border-red-200 px-4 py-2 rounded-xl transition-all">Clear Cart</motion.button>
               <div className="text-right w-full sm:w-auto">
                 <p className="text-xl sm:text-2xl font-black text-slate-900 mb-3">Total: <span className="text-violet-600">{formatRs(total)}</span></p>
-                <motion.button whileTap={{ scale: 0.97 }} onClick={flushAndCheckout} className="w-full sm:w-auto px-8 py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:opacity-90 transition-opacity shadow-md shadow-violet-200">Checkout →</motion.button>
+                <motion.button whileTap={{ scale: 0.97 }} disabled={editor.isLocked} onClick={flushAndCheckout} className="w-full sm:w-auto px-8 py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:opacity-90 transition-opacity shadow-md shadow-violet-200">{editor.isPreparing ? "Preparing checkout..." : "Checkout →"}</motion.button>
               </div>
             </div>
           </motion.div>
         )}
       </div>
       <AnimatePresence>
-        {showCheckout && (
+        {showCheckout && confirmation && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={(e) => e.target === e.currentTarget && setShowCheckout(false)}>
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} transition={{ duration: 0.2 }} className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
               <h2 className="text-xl font-black text-slate-900 mb-5">Confirm Order</h2>
               <div className="bg-slate-50 rounded-xl p-4 mb-4 space-y-2">
-                {items.map((item) => {
-                  const pid = String(item.product?._id ?? item.product ?? item.productId);
-                  const qty = Number(getQty(pid, item.quantity));
-                  return <div key={pid} className="flex justify-between text-sm"><span className="text-slate-700">{item.name} <span className="text-slate-400">× {qty}</span></span><span className="font-semibold text-slate-900">{formatRs(Number(item.price) * qty)}</span></div>;
-                })}
-                <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between font-black text-slate-900"><span>Total</span><span className="text-violet-600">{formatRs(items.reduce((sum, item) => { const pid = String(item.product?._id ?? item.product ?? item.productId); return sum + Number(item.price) * Number(getQty(pid, item.quantity)); }, 0))}</span></div>
+                {confirmation.items.map((item) => (
+                  <div key={item.product} className="flex justify-between text-sm"><span className="text-slate-700">{item.name} <span className="text-slate-400">× {item.quantity}</span></span><span className="font-semibold text-slate-900">{formatRs(item.price * item.quantity)}</span></div>
+                ))}
+                <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between font-black text-slate-900"><span>Total</span><span className="text-violet-600">{formatRs(confirmation.totalAmount)}</span></div>
               </div>
               <div className="mb-5">
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Order Notes <span className="text-slate-400 font-normal">(optional)</span></label>

@@ -1,0 +1,7 @@
+{
+  "git": {
+    "deploymentEnabled": {
+      "fix/phase3-atomic-checkout-2026-11-06": false
+    }
+  }
+}

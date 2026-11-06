@@ -5,6 +5,13 @@ import api from '../../api/axiosInstance';
 import { formatRs } from '../../utils/formatCurrency';
 
 const STATUS_OPTIONS = ['pending', 'confirmed', 'processing', 'completed', 'cancelled'];
+const STATUS_TRANSITIONS = {
+  pending: ['confirmed', 'cancelled'],
+  confirmed: ['processing', 'cancelled'],
+  processing: ['completed', 'cancelled'],
+  completed: [],
+  cancelled: [],
+};
 const STATUS_STYLES = {
   pending:    'bg-amber-100 text-amber-700',
   confirmed:  'bg-blue-100 text-blue-700',
@@ -45,8 +52,8 @@ export default function AdminOrdersPage() {
   });
 
   const updateStatus = useMutation({
-    mutationFn: ({ orderId, status }) => api.patch(`/orders/${orderId}/status`, { status }),
-    onSuccess: () => { queryClient.invalidateQueries(['admin-orders']); setStatusModal(null); },
+    mutationFn: ({ orderId, status }: { orderId: string; status: string }) => api.patch(`/orders/${orderId}/status`, { status }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['admin-orders'] }); setStatusModal(null); },
   });
 
   const allOrders = Array.isArray(data) ? data : [];
@@ -160,18 +167,22 @@ export default function AdminOrdersPage() {
               className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
               <h2 className="text-lg font-black text-slate-900 mb-4">Update Order Status</h2>
               <div className="space-y-2 mb-6">
-                {STATUS_OPTIONS.map((s) => (
+                {(STATUS_TRANSITIONS[statusModal.current] ?? []).map((s) => (
                   <button key={s} onClick={() => setNewStatus(s)}
                     className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${newStatus === s ? 'border-violet-500 bg-violet-50 text-violet-700' : 'border-slate-200 text-slate-600 hover:border-violet-300'}`}>
                     {s.charAt(0).toUpperCase() + s.slice(1)}
                   </button>
                 ))}
+                {(STATUS_TRANSITIONS[statusModal.current] ?? []).length === 0 && (
+                  <p className="text-sm text-slate-500">This order is final. No further status changes are allowed.</p>
+                )}
+                {updateStatus.isError && <p role="alert" className="text-sm text-red-600">{(updateStatus.error as any)?.response?.data?.message ?? 'Status update failed. Please refresh and try again.'}</p>}
               </div>
               <div className="flex gap-3">
                 <button onClick={() => setStatusModal(null)} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 hover:bg-slate-50">Cancel</button>
                 <motion.button whileTap={{ scale: 0.97 }}
                   onClick={() => updateStatus.mutate({ orderId: statusModal.orderId, status: newStatus })}
-                  disabled={updateStatus.isPending || newStatus === statusModal.current}
+                  disabled={updateStatus.isPending || !(STATUS_TRANSITIONS[statusModal.current] ?? []).includes(newStatus)}
                   className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:opacity-90 disabled:opacity-50">
                   {updateStatus.isPending ? 'Saving...' : 'Save'}
                 </motion.button>
