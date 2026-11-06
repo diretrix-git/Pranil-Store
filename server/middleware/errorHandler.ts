@@ -27,6 +27,11 @@ const errorHandler = (err: any, req: Request, res: Response, _next: NextFunction
     return;
   }
 
+  if (err.name === "VersionError") {
+    res.status(409).json({ status: "error", message: "This record changed. Please refresh and try again.", errors: [] });
+    return;
+  }
+
   if (err.code === 11000) {
     const field = err.keyValue ? Object.keys(err.keyValue)[0] : "field";
     res.status(409).json({ status: "error", message: `Duplicate value for field: ${field}`, errors: [] });

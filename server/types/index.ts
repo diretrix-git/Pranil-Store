@@ -91,6 +91,7 @@ export interface ICartItem {
 
 export interface ICart extends Document {
   _id: Types.ObjectId;
+  __v: number;
   buyer: Types.ObjectId;
   items: ICartItem[];
   totalAmount: number;
@@ -129,6 +130,7 @@ export interface IOrder extends Document {
   totalAmount: number;
   status: "pending" | "confirmed" | "processing" | "completed" | "cancelled";
   paymentStatus: "unpaid" | "paid" | "refunded";
+  inventoryState?: "reserved" | "restored";
   notes?: string;
   isDeleted: boolean;
   deletedAt: Date | null;

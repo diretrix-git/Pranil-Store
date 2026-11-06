@@ -39,6 +39,8 @@ const orderSchema = new Schema<IOrder>(
       default: "pending",
     },
     paymentStatus: { type: String, enum: ["unpaid", "paid", "refunded"], default: "unpaid" },
+    // No default: legacy orders need explicit inventory reconciliation.
+    inventoryState: { type: String, enum: ["reserved", "restored"] },
     notes: { type: String, trim: true },
     isDeleted: { type: Boolean, default: false },
     deletedAt: { type: Date, default: null },

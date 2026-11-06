@@ -1,66 +1,39 @@
 import { Request, Response, NextFunction } from "express";
-import Cart from "../models/Cart";
 import Order from "../models/Order";
-import Product from "../models/Product";
 import AppError from "../utils/AppError";
 import logger from "../utils/logger";
 import { queueEmail } from "../queues/emailQueue";
+import { invalidateProductCache } from "../config/redis";
+import { checkoutCart, transitionOrder } from "../services/orderTransactions";
 
 // Statuses that trigger a buyer notification email (not "processing")
 const NOTIFIABLE_STATUSES = new Set(["pending", "confirmed", "completed", "cancelled"]);
 
+// Delivery/cache errors cannot undo a committed purchase. Keep each channel
+// independent so one failed notification does not suppress the others.
+async function afterCommit(label: string, effect: () => unknown): Promise<void> {
+  let timeout: ReturnType<typeof setTimeout>;
+  try {
+    await Promise.race([
+      Promise.resolve().then(effect),
+      new Promise((_, reject) => {
+        timeout = setTimeout(() => reject(new Error("Delivery deadline exceeded")), 1000);
+      }),
+    ]);
+  }
+  catch (error) { logger.warn(`Post-commit ${label} failed: ${(error as Error).message}`); }
+  finally { clearTimeout(timeout); }
+}
+
 export const placeOrder = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const user = (req as any).user;
-    const cart = await Cart.findOne({ buyer: user._id }).populate("items.product");
-    if (!cart || cart.items.length === 0) return next(new AppError("Your cart is empty.", 400));
+    const order = await checkoutCart(user, req.body.notes || "", req.body.cartVersion);
 
-    const stockErrors: string[] = [];
-    for (const item of cart.items) {
-      const prod = item.product as any;
-      if (!prod || prod.stock < item.quantity) {
-        stockErrors.push(`${item.name} (available: ${prod?.stock ?? 0})`);
-      }
-    }
-    if (stockErrors.length > 0) return next(new AppError(`Insufficient stock for: ${stockErrors.join(", ")}`, 409));
-
-    const items = cart.items.map((item) => {
-      const prod = item.product as any;
-      return { product: prod._id, name: item.name, price: item.price, quantity: item.quantity, unit: item.unit, subtotal: item.price * item.quantity };
-    });
-
-    const subtotal = items.reduce((sum, i) => sum + i.subtotal, 0);
-
-    const order = await Order.create({
-      buyer: user._id,
-      buyerSnapshot: { name: user.name, phone: user.phone, email: user.email, address: user.address },
-      items,
-      subtotal,
-      taxAmount: 0,
-      discountAmount: 0,
-      totalAmount: subtotal,
-      notes: req.body.notes || "",
-    });
-
-    // Deduct stock atomically — prevents overselling race condition
-    for (const item of cart.items) {
-      const updated = await Product.findOneAndUpdate(
-        { _id: (item.product as any)._id, stock: { $gte: item.quantity } },
-        { $inc: { stock: -item.quantity } },
-        { new: true },
-      );
-      if (!updated) {
-        // Rollback already-deducted items
-        return next(new AppError(`${item.name} went out of stock. Please refresh your cart.`, 409));
-      }
-    }
-
-    cart.items = [];
-    await cart.save();
-
+    await afterCommit("product cache invalidation", () => invalidateProductCache());
     const io = (req.app as any).get("io");
     if (io) {
-      io.to("admin_room").emit("new_order", {
+      await afterCommit("admin order notification", () => io.to("admin_room").emit("new_order", {
         orderNumber: order.orderNumber,
         buyerName: user.name,
         buyerPhone: user.phone || "",
@@ -69,11 +42,11 @@ export const placeOrder = async (req: Request, res: Response, next: NextFunction
         totalAmount: order.totalAmount,
         orderId: order._id,
         placedAt: order.createdAt,
-      });
+      }));
     }
 
     // Send emails — fire-and-forget, non-blocking
-    queueEmail({ type: "order_placed", order });
+    await afterCommit("order confirmation", () => queueEmail({ type: "order_placed", order }));
 
     res.status(201).json({ status: "success", data: { order }, message: "Order placed successfully" });
   } catch (err) { next(err); }
@@ -88,26 +61,14 @@ export const getBuyerOrders = async (req: Request, res: Response, next: NextFunc
 
 export const updateOrderStatus = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const order = await Order.findOne({ _id: req.params.orderId, isDeleted: false });
-    if (!order) return next(new AppError("Order not found.", 404));
-
-    const previousStatus = order.status;
     const newStatus = req.body.status as string;
-
-    order.status = newStatus as any;
-    await order.save();
-
-    // Restore stock when order is cancelled (only if it wasn't already cancelled)
-    if (newStatus === "cancelled" && previousStatus !== "cancelled") {
-      for (const item of order.items) {
-        await Product.findByIdAndUpdate(item.product, { $inc: { stock: item.quantity } });
-      }
+    const { order, changed } = await transitionOrder(String(req.params.orderId), newStatus);
+    if (changed && newStatus === "cancelled") {
       logger.info(`Stock restored for cancelled order ${order.orderNumber}`);
+      await afterCommit("product cache invalidation", () => invalidateProductCache());
     }
-
-    // Send buyer status email — fire-and-forget
-    if (NOTIFIABLE_STATUSES.has(newStatus) && newStatus !== previousStatus) {
-      queueEmail({ type: "order_status", order, newStatus });
+    if (changed && NOTIFIABLE_STATUSES.has(newStatus)) {
+      await afterCommit("order status notification", () => queueEmail({ type: "order_status", order, newStatus }));
     }
 
     res.status(200).json({ status: "success", data: { order }, message: "Order status updated" });

@@ -6,22 +6,25 @@ import { toast } from "sonner";
 import Navbar from "../../components/Navbar";
 import api from "../../api/axiosInstance";
 import { formatRs } from "../../utils/formatCurrency";
+import { prepareCheckout, type CartConfirmation } from "../../utils/checkout";
 
 export default function CartPage() {
   const queryClient = useQueryClient();
   const [priceWarning, setPriceWarning] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
+  const [confirmation, setConfirmation] = useState<CartConfirmation | null>(null);
   const [notes, setNotes] = useState("");
   const [localQty, setLocalQty] = useState<Record<string, number | string>>({});
 
+  const fetchCart = useCallback(async () => {
+    const res = await api.get("/cart");
+    const payload = res.data.data ?? res.data;
+    if (payload.priceChanged) setPriceWarning(true);
+    return payload.cart ?? payload;
+  }, []);
   const { data: cartData, isLoading } = useQuery({
     queryKey: ["cart"],
-    queryFn: async () => {
-      const res = await api.get("/cart");
-      const payload = res.data.data ?? res.data;
-      if (payload.priceChanged) setPriceWarning(true);
-      return payload.cart ?? payload;
-    },
+    queryFn: fetchCart,
   });
 
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -40,11 +43,12 @@ export default function CartPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["cart"] }),
   });
   const placeOrder = useMutation({
-    mutationFn: () => api.post("/orders", { notes }),
+    mutationFn: () => api.post("/orders", { notes, cartVersion: confirmation?.cartVersion }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cart"] });
       setShowCheckout(false);
       setNotes("");
+      setLocalQty({});
       toast.success("Order placed! 🎉", {
         description: "Check My Orders to view details and your invoice.",
         duration: 6000,
@@ -53,6 +57,7 @@ export default function CartPage() {
     },
     onError: (err: any) => {
       setShowCheckout(false);
+      queryClient.invalidateQueries({ queryKey: ["cart"] });
       toast.error("Order failed", {
         description: err.response?.data?.message ?? "Failed to place order. Please try again.",
       });
@@ -79,25 +84,23 @@ export default function CartPage() {
   }, [updateQty]);
 
   const flushAndCheckout = useCallback(async () => {
-    // Show modal immediately — don't wait for server round trips
-    setShowCheckout(true);
-
-    // Fire qty updates in background (non-blocking)
+    // Confirm only after pending quantities and the server cart revision agree.
     const pending = Object.entries(debounceRef.current);
     pending.forEach(([, timer]) => clearTimeout(timer));
     debounceRef.current = {};
 
-    const dirtyPids = Object.keys(localQty);
-    if (dirtyPids.length > 0) {
-      Promise.all(
-        dirtyPids.map((pid) => {
-          const qty = Number(localQty[pid]);
-          if (qty >= 1) return api.patch(`/cart/item/${pid}`, { quantity: qty }).catch(() => null);
-          return Promise.resolve();
-        })
-      ).then(() => queryClient.invalidateQueries({ queryKey: ["cart"] }));
+    try {
+      const snapshot = await prepareCheckout(localQty,
+        (id, quantity) => api.patch(`/cart/item/${id}`, { quantity }),
+        () => queryClient.fetchQuery({ queryKey: ["cart"], queryFn: fetchCart, staleTime: 0 }));
+      setLocalQty({});
+      setConfirmation(snapshot);
+      setShowCheckout(true);
+    } catch (err: any) {
+      queryClient.invalidateQueries({ queryKey: ["cart"] });
+      toast.error(err.response?.data?.message ?? err.message ?? "Cart update failed. Please review and try again.");
     }
-  }, [localQty, queryClient]);
+  }, [localQty, queryClient, fetchCart]);
   const items: any[] = (cartData as any)?.items ?? [];
   // Compute total from localQty so it stays in sync with what the user typed
   const total: number = items.length > 0
@@ -180,17 +183,15 @@ export default function CartPage() {
         )}
       </div>
       <AnimatePresence>
-        {showCheckout && (
+        {showCheckout && confirmation && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={(e) => e.target === e.currentTarget && setShowCheckout(false)}>
             <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} transition={{ duration: 0.2 }} className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
               <h2 className="text-xl font-black text-slate-900 mb-5">Confirm Order</h2>
               <div className="bg-slate-50 rounded-xl p-4 mb-4 space-y-2">
-                {items.map((item) => {
-                  const pid = String(item.product?._id ?? item.product ?? item.productId);
-                  const qty = Number(getQty(pid, item.quantity));
-                  return <div key={pid} className="flex justify-between text-sm"><span className="text-slate-700">{item.name} <span className="text-slate-400">× {qty}</span></span><span className="font-semibold text-slate-900">{formatRs(Number(item.price) * qty)}</span></div>;
-                })}
-                <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between font-black text-slate-900"><span>Total</span><span className="text-violet-600">{formatRs(items.reduce((sum, item) => { const pid = String(item.product?._id ?? item.product ?? item.productId); return sum + Number(item.price) * Number(getQty(pid, item.quantity)); }, 0))}</span></div>
+                {confirmation.items.map((item) => (
+                  <div key={item.product} className="flex justify-between text-sm"><span className="text-slate-700">{item.name} <span className="text-slate-400">× {item.quantity}</span></span><span className="font-semibold text-slate-900">{formatRs(item.price * item.quantity)}</span></div>
+                ))}
+                <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between font-black text-slate-900"><span>Total</span><span className="text-violet-600">{formatRs(confirmation.totalAmount)}</span></div>
               </div>
               <div className="mb-5">
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Order Notes <span className="text-slate-400 font-normal">(optional)</span></label>

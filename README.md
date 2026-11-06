@@ -7,7 +7,7 @@ Pranil Store is a B2B marketplace where buyers browse products from multiple ven
 - Buyer and admin roles. Buyers sign in through Clerk components; an admin role is assigned through Clerk public metadata and synchronized to MongoDB.
 - Product catalog with search and category, vendor, and price filters.
 - Admin management for products, categories, vendors, buyer accounts, orders, and contact messages.
-- Persistent carts, stock checks and deduction during checkout, order status management, and print-ready invoices.
+- Persistent carts, transactional multi-item checkout with guarded stock deductions, legal order-status transitions and print-ready invoices. MongoDB replica-set support and legacy inventory reconciliation are prerequisites; see [order integrity and rollout notes](docs/phase3-checkout.md).
 - Cloudinary image uploads for admin-managed product images.
 - Admin dashboard metrics and authenticated Socket.IO notifications for new orders and contact messages.
 - Optional Upstash Redis caching for catalog data.
@@ -39,7 +39,7 @@ To deploy your own instance, connect the repository to Render and configure the 
 ### Requirements
 
 - Node.js 20 or newer and npm
-- A MongoDB database
+- A transaction-capable MongoDB replica set or supported sharded cluster (standalone MongoDB cannot run checkout/cancellation)
 - A Clerk application (publishable and secret keys)
 - Cloudinary credentials for product image uploads
 - Optional: Upstash Redis REST credentials for caching
@@ -119,4 +119,6 @@ All application API routes are prefixed by `/api/v1`.
 
 ## Validation
 
-The frontend defines `npm run lint` and `npm run build`. The backend defines `npm run build`. There is no implemented automated test suite; the backend `npm test` script is a placeholder that exits with an error.
+Run `cd server && npm ci --ignore-scripts && npm test` for the order integration and client checkout-helper regression suite. The harness creates and removes its own loopback-only MongoDB 7.0.24 replica set with synthetic data; first use downloads a MongoDB binary. It does not read application environment files or accept a database URI. No Clerk, SMTP or Redis credentials are needed. Node.js 20+ and a supported MongoDB binary platform are required.
+
+The backend defines `npm run typecheck` and `npm run build`. The frontend defines `npm run lint` and `npm run build`; use `npx tsc --noEmit` for its separate typecheck. See [Phase 3 verification results](docs/phase3-verification.md) for actual checks, existing client type errors and lint coverage limits. The integrity tests do not establish deployment or external-service success.
